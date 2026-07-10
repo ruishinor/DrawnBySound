@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>VibratoFlow</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305050a'/%3E%3Cpath d='M2 16 Q9 2 16 16 T30 16' fill='none' stroke='%2354f0c8' stroke-width='2'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #05050a;
+        color: #cfd2e0;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        overflow: hidden;
+      }
+      #viz {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+      #status {
+        position: fixed;
+        left: 12px;
+        bottom: 10px;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      #controls {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 8px 12px;
+        font-size: 13px;
+        background: linear-gradient(#05050acc, #05050a00);
+        backdrop-filter: blur(2px);
+      }
+      #controls .brand {
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        color: #54f0c8;
+      }
+      button,
+      select,
+      input[type='range'] {
+        font: inherit;
+      }
+      #controls button {
+        background: #14142a;
+        color: #cfd2e0;
+        border: 1px solid #2a2a44;
+        border-radius: 6px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      #controls button:hover {
+        border-color: #54f0c8;
+      }
+      input[type='range'] {
+        accent-color: #54f0c8;
+      }
+      #transport {
+        position: fixed;
+        left: 50%;
+        bottom: 34px;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 12px;
+        background: #0c0c18cc;
+        border: 1px solid #2a2a44;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      #transport[hidden] {
+        display: none;
+      }
+      #transport button {
+        background: #14142a;
+        color: #cfd2e0;
+        border: 1px solid #2a2a44;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+      }
+      #transport #seek {
+        width: 220px;
+      }
+      #transport #time {
+        opacity: 0.7;
+        font-variant-numeric: tabular-nums;
+      }
+      #panel {
+        position: fixed;
+        top: 48px;
+        right: 12px;
+        width: 260px;
+        padding: 12px 14px;
+        background: #0c0c18ee;
+        border: 1px solid #2a2a44;
+        border-radius: 10px;
+        display: grid;
+        gap: 10px;
+        font-size: 13px;
+        box-shadow: 0 8px 30px #000a;
+      }
+      #panel[hidden] {
+        display: none;
+      }
+      #panel .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 8px;
+      }
+      #panel .row.full {
+        grid-template-columns: 1fr;
+      }
+      #panel label {
+        opacity: 0.85;
+      }
+      #panel select,
+      #panel input[type='range'] {
+        width: 130px;
+      }
+      #panel select {
+        background: #14142a;
+        color: #cfd2e0;
+        border: 1px solid #2a2a44;
+        border-radius: 6px;
+        padding: 3px 6px;
+      }
+      #panel .reset {
+        background: #1a1430;
+        color: #cfd2e0;
+        border: 1px solid #2a2a44;
+        border-radius: 6px;
+        padding: 5px;
+        cursor: pointer;
+      }
+      #panel h3 {
+        margin: 0;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="viz"></canvas>
+    <div id="controls">
+      <span class="brand">VibratoFlow</span>
+      <button id="demo" type="button">Demo signal</button>
+      <button id="mic" type="button">Microphone</button>
+      <button id="system" type="button">System audio</button>
+      <button id="stop" type="button" title="Stop listening">■ Stop</button>
+      <label
+        ><span style="opacity: 0.7">File</span>
+        <input id="file" type="file" accept="audio/*" /></label
+      >
+      <button id="export" type="button" style="margin-left: auto">⤓ PNG</button>
+      <button id="settings-btn" type="button">⚙ Settings</button>
+    </div>
+    <div id="transport" hidden>
+      <button id="playpause" type="button">▶</button>
+      <input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
+      <span id="time">0:00 / 0:00</span>
+    </div>
+    <div id="panel" hidden></div>
+    <div id="status">Loading VibratoFlow…</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
