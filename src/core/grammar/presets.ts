@@ -13,6 +13,58 @@ export interface Preset {
 
 export const PRESETS: readonly Preset[] = [
   {
+    id: 'warm-room',
+    label: 'Warm room',
+    settings: {
+      mode: 'stereo-xy',
+      palette: 'warm-amber',
+      persistence: 0.91,
+      bloom: 0.28,
+      baseIntensity: 0.95,
+      bassDrive: 0.6,
+      onsetDrive: 0.7,
+    },
+  },
+  {
+    id: 'mineral-lines',
+    label: 'Mineral lines',
+    settings: {
+      mode: 'mono-phase-xy',
+      palette: 'mineral-blue',
+      persistence: 0.95,
+      bloom: 0.22,
+      baseIntensity: 0.9,
+      bassDrive: 0.5,
+      onsetDrive: 0.4,
+    },
+  },
+  {
+    id: 'paper-trace',
+    label: 'Paper trace',
+    settings: {
+      mode: 'stereo-xy',
+      palette: 'soft-white',
+      persistence: 0.87,
+      bloom: 0.08,
+      baseIntensity: 0.8,
+      bassDrive: 0.4,
+      onsetDrive: 0.4,
+    },
+  },
+  {
+    id: 'dusty-rose',
+    label: 'Dusty rose',
+    settings: {
+      mode: 'beat-lissajous',
+      palette: 'dusty-rose',
+      persistence: 0.9,
+      bloom: 0.25,
+      baseIntensity: 0.9,
+      bassDrive: 0.55,
+      onsetDrive: 0.75,
+    },
+  },
+  {
     id: 'classic-oscilloscope',
     label: 'Classic Oscilloscope',
     settings: {

@@ -29,7 +29,7 @@ function crossOriginIsolation(): Plugin {
 
 export default defineConfig({
   plugins: [crossOriginIsolation()],
-  server: { port: 5173 },
+  server: { port: 5174, strictPort: true },
   preview: { port: 4173 },
   test: {
     environment: 'node',

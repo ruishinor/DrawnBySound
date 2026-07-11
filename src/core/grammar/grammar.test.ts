@@ -87,8 +87,25 @@ describe('toRenderParams (deterministic grammar)', () => {
   it('exposes separate NorwegianFlow and NorwegianFlag labels', () => {
     expect(PALETTE_IDS).toContain('norwegian-flow');
     expect(PALETTE_IDS).toContain('norwegian-flag');
-    expect(paletteLabel('norwegian-flow')).toBe('NorwegianFlow');
-    expect(paletteLabel('norwegian-flag')).toBe('NorwegianFlag');
+    expect(paletteLabel('norwegian-flow')).toBe('Norwegian flow');
+    expect(paletteLabel('norwegian-flag')).toBe('Norwegian flag');
+  });
+
+  it('uses a user-picked colour and disables animated palette modes', () => {
+    const p = toRenderParams(
+      frameWith({ rms: 0.5, centroid: 0.8 }),
+      {
+        ...DEFAULT_SETTINGS,
+        palette: 'norwegian-flow',
+        useCustomColor: true,
+        customColor: '#336699',
+      },
+      12.5,
+    );
+
+    expect(p.colorMode).toBe('solid');
+    expect(p.color[0] / p.color[1]).toBeCloseTo(0.5, 4);
+    expect(p.color[2] / p.color[1]).toBeCloseTo(1.5, 4);
   });
 });
 
@@ -102,7 +119,7 @@ describe('presets differ meaningfully (not just color)', () => {
       // Signature excludes color, so distinctness proves behavioral difference.
       sigs.add([s.mode, p.decay.toFixed(3), p.bloom.toFixed(3), p.scale.toFixed(3)].join('|'));
     }
-    // At least 7 of 8 presets are behaviorally distinct.
-    expect(sigs.size).toBeGreaterThanOrEqual(7);
+    // The expanded set must still differ by behavior, not merely by colour.
+    expect(sigs.size).toBeGreaterThanOrEqual(9);
   });
 });
