@@ -39,9 +39,9 @@ export function detectCapabilities(): ModeCapability[] {
     { id: 'player', label: 'Play in app', available: true, note: 'Synchronized playback.' },
     {
       id: 'system',
-      label: 'Other-app / system audio',
+      label: 'External app',
       available: hasDisplay,
-      note: hasDisplay ? COPY.systemCaptureLimited : 'System audio capture is not supported here.',
+      note: hasDisplay ? COPY.systemCaptureLimited : 'External app audio capture is unavailable in this browser. Use Microphone or Audio file.',
     },
   ];
 }

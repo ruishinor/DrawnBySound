@@ -87,7 +87,14 @@ void main() {
 export function traceAspectScale(width: number, height: number): readonly [number, number] {
   const safeWidth = Math.max(1, width);
   const safeHeight = Math.max(1, height);
-  return safeWidth > safeHeight ? [safeHeight / safeWidth, 1] : [1, 1];
+  if (safeWidth <= safeHeight) return [1, 1];
+
+  // Preserve equal physical X/Y scale, then add a restrained landscape-only
+  // occupancy lift. This avoids the previous wide-stage flattening without
+  // leaving the corrected trace unnecessarily small in the centre.
+  const aspect = safeWidth / safeHeight;
+  const occupancy = Math.min(1.16, Math.sqrt(aspect));
+  return [(safeHeight / safeWidth) * occupancy, occupancy];
 }
 
 /**

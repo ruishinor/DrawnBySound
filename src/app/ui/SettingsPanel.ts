@@ -1,4 +1,9 @@
-import type { AppearancePreference, SettingsStore, Settings } from '../SettingsStore';
+import type {
+  AppearancePreference,
+  InterfaceAccent,
+  Settings,
+  SettingsStore,
+} from '../SettingsStore';
 import { PRESETS } from '../../core/grammar/presets';
 import { PALETTE_IDS, paletteLabel } from '../../core/grammar/palettes';
 import { MODES } from '../../core/render/modes';
@@ -8,7 +13,7 @@ function controlId(label: string): string {
   return `vf-${slug}`;
 }
 
-/** Accessible, dependency-free settings sheet backed by the persistent store. */
+/** Accessible, dependency-free settings modal backed by the persistent store. */
 export class SettingsPanel {
   private readonly el: HTMLElement;
   private lastFocus: HTMLElement | null = null;
@@ -37,7 +42,10 @@ export class SettingsPanel {
 
   open(trigger?: HTMLElement): void {
     this.lastFocus = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    document.body.classList.add('settings-open');
+    document.getElementById('app-shell')?.setAttribute('inert', '');
     this.el.hidden = false;
+    this.el.scrollTop = 0;
     this.onVisibilityChange(true);
     requestAnimationFrame(() => this.el.querySelector<HTMLElement>('.panel-close')?.focus());
   }
@@ -45,6 +53,8 @@ export class SettingsPanel {
   close(): void {
     if (this.el.hidden) return;
     this.el.hidden = true;
+    document.getElementById('app-shell')?.removeAttribute('inert');
+    document.body.classList.remove('settings-open');
     this.onVisibilityChange(false);
     this.lastFocus?.focus();
   }
@@ -148,13 +158,17 @@ export class SettingsPanel {
     return row;
   }
 
-  private colorPicker(value: string): HTMLElement {
+  private colorPicker(
+    label: string,
+    value: string,
+    onSet: (value: string) => void,
+  ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'setting-row';
-    const id = controlId('Custom colour');
+    const id = controlId(label);
     const lab = document.createElement('label');
     lab.htmlFor = id;
-    lab.textContent = 'Custom colour';
+    lab.textContent = label;
     const control = document.createElement('div');
     control.className = 'color-control';
     const input = document.createElement('input');
@@ -165,15 +179,58 @@ export class SettingsPanel {
     const text = document.createElement('span');
     text.className = 'color-value';
     text.textContent = value;
-    input.addEventListener('change', () => {
+    input.addEventListener('input', () => {
       text.textContent = input.value;
-      this.store.update({ customColor: input.value, useCustomColor: true });
-      this.onChange();
-      this.render();
+      onSet(input.value);
     });
     control.append(input, text);
     row.append(lab, control);
     return row;
+  }
+
+  private help(): HTMLElement {
+    const details = document.createElement('details');
+    details.className = 'help-details';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Help and limitations';
+    details.appendChild(summary);
+
+    const items: ReadonlyArray<readonly [string, string]> = [
+      [
+        'How does microphone mode work?',
+        'It listens through the microphone selected by your browser. Headphones do not route another app directly into the microphone.',
+      ],
+      [
+        'Why is External app unavailable on my phone?',
+        'Mobile browsers generally do not expose display or app-audio capture. Use Microphone or Audio file on those devices.',
+      ],
+      [
+        'Why does External app sometimes have no sound?',
+        'The browser, operating system, selected share surface, and source app must all allow audio sharing.',
+      ],
+      [
+        'Does audio leave this device?',
+        'No. Analysis and visual rendering run locally in the browser.',
+      ],
+      [
+        'What is remembered?',
+        'Visual preferences, interface choices, and your preferred source are stored locally. Protected sources and files are never restarted automatically.',
+      ],
+    ];
+
+    const content = document.createElement('div');
+    content.className = 'help-content';
+    for (const [question, answer] of items) {
+      const item = document.createElement('div');
+      const heading = document.createElement('h4');
+      heading.textContent = question;
+      const paragraph = document.createElement('p');
+      paragraph.textContent = answer;
+      item.append(heading, paragraph);
+      content.appendChild(item);
+    }
+    details.appendChild(content);
+    return details;
   }
 
   private render(): void {
@@ -185,7 +242,7 @@ export class SettingsPanel {
     const copy = document.createElement('div');
     const title = document.createElement('h2');
     title.id = 'settings-title';
-    title.textContent = 'Adjust the visual';
+    title.textContent = 'Visual settings';
     const description = document.createElement('p');
     description.textContent = 'Changes are stored on this device. No account or upload is used.';
     copy.append(title, description);
@@ -198,8 +255,8 @@ export class SettingsPanel {
     header.append(copy, close);
     this.el.appendChild(header);
 
-    const appearance = this.section('Appearance');
-    appearance.appendChild(
+    const interfaceSection = this.section('Interface');
+    interfaceSection.appendChild(
       this.select(
         'Interface theme',
         [
@@ -211,7 +268,37 @@ export class SettingsPanel {
         (value) => this.set('appearance', value as AppearancePreference),
       ),
     );
-    appearance.appendChild(
+    interfaceSection.appendChild(
+      this.select(
+        'Interface accent',
+        [
+          { value: 'graphite', label: 'Graphite' },
+          { value: 'moss', label: 'Moss' },
+          { value: 'plum', label: 'Plum' },
+          { value: 'clay', label: 'Clay' },
+          { value: 'slate', label: 'Slate' },
+        ],
+        settings.interfaceAccent,
+        (value) => this.set('interfaceAccent', value as InterfaceAccent),
+      ),
+    );
+    interfaceSection.appendChild(
+      this.colorPicker('Custom interface accent', settings.customInterfaceAccent, (value) => {
+        this.store.update({ customInterfaceAccent: value, useCustomInterfaceAccent: true });
+        const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom interface accent')}`);
+        if (toggle) toggle.checked = true;
+        this.onChange();
+      }),
+    );
+    interfaceSection.appendChild(
+      this.checkbox('Use custom interface accent', settings.useCustomInterfaceAccent, (value) =>
+        this.set('useCustomInterfaceAccent', value),
+      ),
+    );
+    this.el.appendChild(interfaceSection);
+
+    const visual = this.section('Visual');
+    visual.appendChild(
       this.select(
         'Preset',
         [{ value: '', label: 'Choose a preset' }, ...PRESETS.map((preset) => ({ value: preset.id, label: preset.label }))],
@@ -225,7 +312,7 @@ export class SettingsPanel {
         },
       ),
     );
-    appearance.appendChild(
+    visual.appendChild(
       this.select(
         'Shape',
         MODES.map((mode) => ({ value: mode.id, label: mode.label })),
@@ -233,23 +320,31 @@ export class SettingsPanel {
         (value) => this.set('mode', value),
       ),
     );
-    appearance.appendChild(
+    visual.appendChild(
       this.select(
         'Colour set',
         PALETTE_IDS.map((palette) => ({ value: palette, label: paletteLabel(palette) })),
         settings.palette,
         (value) => {
           this.store.update({ palette: value, useCustomColor: false });
+          const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
+          if (toggle) toggle.checked = false;
           this.onChange();
-          this.render();
         },
       ),
     );
-    appearance.appendChild(this.colorPicker(settings.customColor));
-    appearance.appendChild(
+    visual.appendChild(
+      this.colorPicker('Custom colour', settings.customColor, (value) => {
+        this.store.update({ customColor: value, useCustomColor: true });
+        const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
+        if (toggle) toggle.checked = true;
+        this.onChange();
+      }),
+    );
+    visual.appendChild(
       this.checkbox('Use custom colour', settings.useCustomColor, (value) => this.set('useCustomColor', value)),
     );
-    this.el.appendChild(appearance);
+    this.el.appendChild(visual);
 
     const response = this.section('Response');
     response.appendChild(this.range('Sensitivity', 0.2, 3, 0.1, settings.sensitivity, (value) => this.set('sensitivity', value)));
@@ -264,17 +359,24 @@ export class SettingsPanel {
     accessibility.appendChild(this.checkbox('Show diagnostics', settings.showDebug, (value) => this.set('showDebug', value)));
     this.el.appendChild(accessibility);
 
-    const resetSection = this.section('Reset');
+    const helpSection = this.section('FAQ');
+    helpSection.appendChild(this.help());
+    this.el.appendChild(helpSection);
+
+    const actions = document.createElement('section');
+    actions.className = 'settings-actions';
     const reset = document.createElement('button');
     reset.className = 'panel-reset';
     reset.type = 'button';
-    reset.textContent = 'Restore visual defaults';
+    reset.textContent = 'Restore defaults';
     reset.addEventListener('click', () => {
+      const confirmed = globalThis.confirm('Restore visual settings to their defaults? Interface and source preferences will be kept.');
+      if (!confirmed) return;
       this.store.reset();
       this.onChange();
       this.render();
     });
-    resetSection.appendChild(reset);
-    this.el.appendChild(resetSection);
+    actions.appendChild(reset);
+    this.el.appendChild(actions);
   }
 }
