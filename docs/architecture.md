@@ -6,7 +6,7 @@ Finalized name **VibratoFlow** (PRD working title was "OscilloFlow").
 ## Pipeline (PRD §15.1)
 
 ```
-Input adapter (mic / file / system / oscillator-test)
+Input adapter (mic / decoded file / browser-media file fallback / system / oscillator-test)
   → AudioWorklet  preprocessor.worklet.ts   [audio thread, no allocation]
       DC removal · AGC + soft limiter · clip flag · fast features (RMS/peak/ZCR/env)
   → RingBuffer (SharedArrayBuffer, lock-free SPSC; ch: L, R, mono)
@@ -39,8 +39,10 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-The dev/preview servers set these (see `crossOriginIsolation()` in `vite.config.ts`). Without
-them the app degrades honestly to demo-only with an explanatory status (`realtimeSupported()` in
+The dev/preview servers set these (see `crossOriginIsolation()` in `vite.config.ts`) and Vercel
+uses `vercel.json`. The AudioWorklet is emitted through Vite `?worker&url` as a separate
+executable JavaScript chunk and checked by `scripts/verify-dist.mjs`. Without them the app
+degrades honestly to demo-only with an explanatory status (`realtimeSupported()` in
 `src/core/capture/Capabilities.ts`). A postMessage fallback pipeline is deliberately deferred —
 see "Accepted trade-offs".
 
@@ -49,9 +51,11 @@ see "Accepted trade-offs".
 - `BandXY` / `HybridGrammar` use module-scope scratch buffers: allocation-free by design; safe
   because exactly one render loop runs per page. Not re-entrant — do not call from workers.
 - The demo signal bypasses the analysis graph and fakes gentle features (`applyDemoFrame`).
-- `main.ts` is a single composition root (~400 lines). A structural refactor is backlog: it is
+- `main.ts` is a large single composition root. A structural refactor is backlog: it is
   fully behind the gate tests and pre-1.0 churn risk outweighs value.
 - SAB fallback (postMessage transport) deferred until a target host cannot set COOP/COEP.
+- File import uses decoded-buffer playback first and a same-origin blob/media-element fallback
+  when the browser rejects the file in `decodeAudioData()`.
 
 ## Module map
 

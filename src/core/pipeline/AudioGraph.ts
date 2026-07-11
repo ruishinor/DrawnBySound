@@ -1,3 +1,4 @@
+import preprocessorWorkletUrl from '../preprocess/preprocessor.worklet.ts?worker&url';
 import { RingBuffer } from './RingBuffer';
 import { FeatureBus, FAST } from './FeatureBus';
 import { SpectralBus } from './SpectralBus';
@@ -50,40 +51,60 @@ export class AudioGraph {
   }
 
   static async create(): Promise<AudioGraph> {
+    if (typeof AudioContext === 'undefined' || typeof AudioWorkletNode === 'undefined') {
+      throw new Error('Web Audio AudioWorklet support is unavailable.');
+    }
+
     const ctx = new AudioContext();
-    await ctx.audioWorklet.addModule(
-      new URL('../preprocess/preprocessor.worklet.ts', import.meta.url),
-    );
-    const ring = RingBuffer.create(RING_CAPACITY, RING_CHANNELS);
-    const bus = FeatureBus.create();
-    const specBus = SpectralBus.create();
-    const classBus = ClassBus.create();
-    const node = new AudioWorkletNode(ctx, 'vibrato-preprocessor', {
-      numberOfInputs: 1,
-      numberOfOutputs: 1,
-      outputChannelCount: [1],
-      processorOptions: { ringSAB: ring.sab, capacity: RING_CAPACITY, featureSAB: bus.sab },
-    });
-    node.connect(ctx.destination); // silent output keeps process() pulling
+    let node: AudioWorkletNode | null = null;
+    let worker: Worker | null = null;
+    try {
+      // Invoke resume before the first asynchronous module load so mobile
+      // browsers can associate it with the user's input gesture.
+      if (ctx.state !== 'running') await ctx.resume();
+      if (!ctx.audioWorklet) throw new Error('AudioWorklet is unavailable.');
+      // Vite must bundle the TypeScript worklet as executable JavaScript. Using
+      // ?worker&url emits a separate production chunk instead of an invalid
+      // data:video/mp2t URL containing raw TypeScript.
+      await ctx.audioWorklet.addModule(preprocessorWorkletUrl);
 
-    const worker = new Worker(new URL('../features/features.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-    const initMsg = {
-      type: 'init',
-      ringSAB: ring.sab,
-      capacity: RING_CAPACITY,
-      specSAB: specBus.sab,
-      fastSAB: bus.sab,
-      classSAB: classBus.sab,
-      fftSize: FFT_SIZE,
-      sampleRate: ctx.sampleRate,
-      hopMs: HOP_MS,
-      classifyEvery: CLASSIFY_EVERY,
-    };
-    worker.postMessage(initMsg);
+      const ring = RingBuffer.create(RING_CAPACITY, RING_CHANNELS);
+      const bus = FeatureBus.create();
+      const specBus = SpectralBus.create();
+      const classBus = ClassBus.create();
+      node = new AudioWorkletNode(ctx, 'vibrato-preprocessor', {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
+        processorOptions: { ringSAB: ring.sab, capacity: RING_CAPACITY, featureSAB: bus.sab },
+      });
+      node.connect(ctx.destination); // silent output keeps process() pulling
 
-    return new AudioGraph(ctx, node, ring, bus, specBus, classBus, worker, initMsg);
+      worker = new Worker(new URL('../features/features.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      const initMsg = {
+        type: 'init',
+        ringSAB: ring.sab,
+        capacity: RING_CAPACITY,
+        specSAB: specBus.sab,
+        fastSAB: bus.sab,
+        classSAB: classBus.sab,
+        fftSize: FFT_SIZE,
+        sampleRate: ctx.sampleRate,
+        hopMs: HOP_MS,
+        classifyEvery: CLASSIFY_EVERY,
+      };
+      worker.postMessage(initMsg);
+
+      return new AudioGraph(ctx, node, ring, bus, specBus, classBus, worker, initMsg);
+    } catch (error) {
+      worker?.terminate();
+      node?.disconnect();
+      await ctx.close().catch(() => undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Audio engine initialization failed: ${message}`, { cause: error });
+    }
   }
 
   connectInput(source: AudioNode): void {
