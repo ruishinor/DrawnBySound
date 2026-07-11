@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { toRenderParams } from './mappings';
-import { PRESETS } from './presets';
+import { matchingPresetId, PRESETS } from './presets';
 import { PALETTE_IDS, paletteLabel } from './palettes';
 import { DEFAULT_SETTINGS, type Settings } from '../../app/SettingsStore';
 import { createFeatureFrame, type FeatureFrame } from '../features/FeatureFrame';
@@ -106,6 +106,34 @@ describe('toRenderParams (deterministic grammar)', () => {
     expect(p.colorMode).toBe('solid');
     expect(p.color[0] / p.color[1]).toBeCloseTo(0.5, 4);
     expect(p.color[2] / p.color[1]).toBeCloseTo(1.5, 4);
+  });
+});
+
+describe('preset identity and guidance', () => {
+  it('provides guidance and complete visual tuning for every preset', () => {
+    const controlledKeys = [
+      'mode',
+      'palette',
+      'persistence',
+      'bloom',
+      'baseScale',
+      'baseIntensity',
+      'bassDrive',
+      'onsetDrive',
+    ] as const;
+    for (const preset of PRESETS) {
+      expect(preset.description.trim().length).toBeGreaterThan(20);
+      for (const key of controlledKeys) expect(preset.settings[key]).toBeDefined();
+    }
+  });
+
+  it('identifies an applied preset and rejects a modified preset', () => {
+    const preset = PRESETS.find((candidate) => candidate.id === 'deep-bass-field');
+    expect(preset).toBeDefined();
+    const applied = { ...DEFAULT_SETTINGS, ...preset!.settings };
+    expect(matchingPresetId(applied)).toBe('deep-bass-field');
+    expect(matchingPresetId({ ...applied, bloom: 0.1 })).toBeNull();
+    expect(matchingPresetId({ ...applied, useCustomColor: true })).toBeNull();
   });
 });
 
