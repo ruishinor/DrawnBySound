@@ -7,7 +7,7 @@ interface Stop {
   c: RGB;
 }
 
-/** Colour sets mapped by brightness t∈[0,1]. Muted sets lead; legacy neon sets remain available. */
+/** Colour sets mapped by brightness t∈[0,1]. Neutral sets lead; legacy palettes remain available. */
 const PALETTES: Record<string, Stop[]> = {
   'warm-amber': [
     { t: 0, c: [0.55, 0.22, 0.07] },
@@ -103,16 +103,16 @@ function lerpStops(stops: Stop[], t: number): RGB {
 
 /** Resolve a palette colour at brightness `t`, scaled by `intensity`. */
 export function paletteColor(id: string, t: number, intensity: number): RGB {
-  const stops = PALETTES[id] ?? PALETTES['warm-amber'];
+  const stops = PALETTES[id] ?? PALETTES.mono;
   const base = lerpStops(stops, t);
   const k = clamp(intensity, 0, 4);
   return [base[0] * k, base[1] * k, base[2] * k];
 }
 
-/** Resolve a validated #rrggbb colour. Invalid values fall back to warm amber. */
+/** Resolve a validated #rrggbb colour. Invalid values fall back to monochrome. */
 export function customColor(hex: string, intensity: number): RGB {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/iu.exec(hex);
-  if (!match) return paletteColor('warm-amber', 0.5, intensity);
+  if (!match) return paletteColor('mono', 0.5, intensity);
   const k = clamp(intensity, 0, 4);
   return [
     (Number.parseInt(match[1], 16) / 255) * k,

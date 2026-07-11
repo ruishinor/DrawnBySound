@@ -51,26 +51,78 @@ afterEach(() => {
 describe('SettingsStore persistence', () => {
   it('uses restrained defaults and persists user changes locally', () => {
     const first = new SettingsStore();
-    expect(first.get().palette).toBe('warm-amber');
+    expect(first.get().palette).toBe('mono');
+    expect(first.get().appearance).toBe('system');
     expect(first.wasRestored()).toBe(false);
 
-    first.update({ palette: 'mineral-blue', sensitivity: 1.7, customColor: '#336699' });
+    first.update({ palette: 'ice', sensitivity: 1.7, customColor: '#336699', appearance: 'dark' });
     const second = new SettingsStore();
 
     expect(second.wasRestored()).toBe(true);
     expect(second.get()).toMatchObject({
-      palette: 'mineral-blue',
+      palette: 'ice',
       sensitivity: 1.7,
       customColor: '#336699',
+      appearance: 'dark',
     });
+  });
+
+  it('migrates the retired theme defaults without changing other persisted preferences', () => {
+    localStorage.setItem(
+      'vibratoflow.settings.v2',
+      JSON.stringify({
+        inputGain: 1,
+        sensitivity: 1,
+        persistence: 0.9,
+        bloom: 0.28,
+        baseScale: 0.9,
+        baseIntensity: 0.95,
+        bassDrive: 0.6,
+        onsetDrive: 0.8,
+        mode: 'stereo-xy',
+        palette: 'warm-amber',
+        customColor: '#c98a55',
+        useCustomColor: false,
+        preferredSource: 'mic',
+      }),
+    );
+
+    const settings = new SettingsStore().get();
+    expect(settings.palette).toBe(DEFAULT_SETTINGS.palette);
+    expect(settings.customColor).toBe(DEFAULT_SETTINGS.customColor);
+    expect(settings.preferredSource).toBe('mic');
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('preserves a deliberate previous-version palette choice', () => {
+    localStorage.setItem(
+      'vibratoflow.settings.v2',
+      JSON.stringify({
+        inputGain: 1,
+        sensitivity: 1.2,
+        persistence: 0.9,
+        bloom: 0.28,
+        baseScale: 0.9,
+        baseIntensity: 0.95,
+        bassDrive: 0.6,
+        onsetDrive: 0.8,
+        mode: 'stereo-xy',
+        palette: 'warm-amber',
+        customColor: '#c98a55',
+        useCustomColor: false,
+      }),
+    );
+
+    expect(new SettingsStore().get().palette).toBe('warm-amber');
   });
 
   it('preserves the preferred source when visual settings are reset', () => {
     const store = new SettingsStore();
-    store.update({ preferredSource: 'mic', palette: 'neon', bloom: 1.4 });
+    store.update({ preferredSource: 'mic', appearance: 'dark', palette: 'neon', bloom: 1.4 });
     store.reset();
 
     expect(store.get().preferredSource).toBe('mic');
+    expect(store.get().appearance).toBe('dark');
     expect(store.get().palette).toBe(DEFAULT_SETTINGS.palette);
     expect(store.get().bloom).toBe(DEFAULT_SETTINGS.bloom);
   });
@@ -83,6 +135,7 @@ describe('SettingsStore persistence', () => {
         bloom: -2,
         customColor: 'javascript:alert(1)',
         preferredSource: 'camera',
+        appearance: 'sepia',
         lowPower: 'yes',
       }),
     );
@@ -92,6 +145,7 @@ describe('SettingsStore persistence', () => {
     expect(settings.bloom).toBe(0);
     expect(settings.customColor).toBe(DEFAULT_SETTINGS.customColor);
     expect(settings.preferredSource).toBe(DEFAULT_SETTINGS.preferredSource);
+    expect(settings.appearance).toBe(DEFAULT_SETTINGS.appearance);
     expect(settings.lowPower).toBe(false);
   });
 });
@@ -103,12 +157,14 @@ describe('sanitizeSettings', () => {
         customColor: '#Aa00fF',
         preferredSource: 'system',
         reducedMotion: true,
+        appearance: 'light',
         mode: 'stereo-xy',
       }),
     ).toEqual({
       customColor: '#aa00ff',
       preferredSource: 'system',
       reducedMotion: true,
+      appearance: 'light',
       mode: 'stereo-xy',
     });
   });

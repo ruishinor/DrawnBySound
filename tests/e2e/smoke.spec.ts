@@ -90,7 +90,7 @@ test('visual preferences persist across a reload without auto-starting protected
   await page.goto('/');
   await hooks(page);
   await page.click('#settings-btn');
-  await page.getByLabel('Colour set').selectOption('mineral-blue');
+  await page.getByLabel('Colour set').selectOption('mono');
   await page.getByLabel('Sensitivity').evaluate((element) => {
     const input = element as HTMLInputElement;
     input.value = '1.7';
@@ -99,8 +99,30 @@ test('visual preferences persist across a reload without auto-starting protected
   await page.reload();
   await hooks(page);
   await page.click('#settings-btn');
-  await expect(page.getByLabel('Colour set')).toHaveValue('mineral-blue');
+  await expect(page.getByLabel('Colour set')).toHaveValue('mono');
   await expect(page.getByLabel('Sensitivity')).toHaveValue('1.7');
+});
+
+
+test('interface theme persists across reloads', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+
+  const appearance = page.getByLabel('Interface theme');
+  await appearance.selectOption('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#111317');
+
+  await page.reload();
+  await hooks(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.click('#settings-btn');
+  await expect(page.getByLabel('Interface theme')).toHaveValue('dark');
+
+  await page.getByLabel('Interface theme').selectOption('light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#f3f4f6');
 });
 
 test('settings form controls have associated labels and stable names', async ({ page }) => {

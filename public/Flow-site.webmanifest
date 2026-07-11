@@ -7,7 +7,7 @@
   "scope": "/",
   "display": "standalone",
   "background_color": "#05050a",
-  "theme_color": "#07051a",
+  "theme_color": "#111317",
   "icons": [
     {
       "src": "/Flow-icon-192.png",

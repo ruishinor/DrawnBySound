@@ -1,4 +1,4 @@
-import type { SettingsStore, Settings } from '../SettingsStore';
+import type { AppearancePreference, SettingsStore, Settings } from '../SettingsStore';
 import { PRESETS } from '../../core/grammar/presets';
 import { PALETTE_IDS, paletteLabel } from '../../core/grammar/palettes';
 import { MODES } from '../../core/render/modes';
@@ -199,6 +199,18 @@ export class SettingsPanel {
     this.el.appendChild(header);
 
     const appearance = this.section('Appearance');
+    appearance.appendChild(
+      this.select(
+        'Interface theme',
+        [
+          { value: 'system', label: 'Use device setting' },
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        settings.appearance,
+        (value) => this.set('appearance', value as AppearancePreference),
+      ),
+    );
     appearance.appendChild(
       this.select(
         'Preset',

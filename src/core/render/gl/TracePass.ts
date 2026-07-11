@@ -3,10 +3,11 @@ import type { RenderParams } from '../RenderParams';
 
 const TRACE_VERT = `#version 300 es
 layout(location=0) in vec2 aPos;   // XY position already in NDC [-1,1]
+uniform vec2 uAspectScale;
 out vec2 vPos;
 void main() {
   vPos = aPos;
-  gl_Position = vec4(aPos, 0.0, 1.0);
+  gl_Position = vec4(aPos * uAspectScale, 0.0, 1.0);
   gl_PointSize = 1.0;
 }`;
 
@@ -78,6 +79,17 @@ void main() {
   frag = vec4(emission, 1.0);
 }`;
 
+
+/**
+ * Preserve the trace's intended proportions on wide stages. Portrait and
+ * square stages keep the existing full-height behavior used on mobile.
+ */
+export function traceAspectScale(width: number, height: number): readonly [number, number] {
+  const safeWidth = Math.max(1, width);
+  const safeHeight = Math.max(1, height);
+  return safeWidth > safeHeight ? [safeHeight / safeWidth, 1] : [1, 1];
+}
+
 /**
  * Draws the oscilloscope XY trace as an additive LINE_STRIP into a render
  * target. Interleaved (x,y) NDC positions are streamed each frame.
@@ -92,6 +104,7 @@ export class TracePass {
   private readonly locColorMode: WebGLUniformLocation | null;
   private readonly locFlowTime: WebGLUniformLocation | null;
   private readonly locTraceBounds: WebGLUniformLocation | null;
+  private readonly locAspectScale: WebGLUniformLocation | null;
 
   constructor(
     private readonly gl: WebGL2RenderingContext,
@@ -115,6 +128,7 @@ export class TracePass {
     this.locColorMode = gl.getUniformLocation(this.program, 'uColorMode');
     this.locFlowTime = gl.getUniformLocation(this.program, 'uFlowTime');
     this.locTraceBounds = gl.getUniformLocation(this.program, 'uTraceBounds');
+    this.locAspectScale = gl.getUniformLocation(this.program, 'uAspectScale');
   }
 
   private ensureCapacity(verts: number): void {
@@ -155,6 +169,8 @@ export class TracePass {
       colorMode === 'norwegian-flow' ? 1 : colorMode === 'norwegian-flag' ? 2 : 0;
     gl.uniform1i(this.locColorMode, colorModeId);
     gl.uniform1f(this.locFlowTime, colorFlowTime);
+    const [aspectX, aspectY] = traceAspectScale(target.width, target.height);
+    gl.uniform2f(this.locAspectScale, aspectX, aspectY);
 
     let minX = positions[0];
     let minY = positions[1];

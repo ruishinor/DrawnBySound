@@ -16,7 +16,7 @@ import { detectCapabilities, realtimeSupported } from './core/capture/Capabiliti
 import { startOscillator, type OscillatorHandle } from './core/capture/OscillatorSource';
 import type { FeatureBus } from './core/pipeline/FeatureBus';
 import { createFeatureFrame } from './core/features/FeatureFrame';
-import { SettingsStore, type SourcePreference } from './app/SettingsStore';
+import { SettingsStore, type AppearancePreference, type SourcePreference } from './app/SettingsStore';
 import { SettingsPanel } from './app/ui/SettingsPanel';
 import { DebugOverlay } from './app/ui/DebugOverlay';
 import { COPY } from './app/ui/copy';
@@ -60,6 +60,10 @@ function argmax(a: Float32Array): number {
   return m;
 }
 
+function resolveAppearance(preference: AppearancePreference, prefersDark: boolean): 'light' | 'dark' {
+  return preference === 'system' ? (prefersDark ? 'dark' : 'light') : preference;
+}
+
 function main(): void {
   document.title = APP_NAME;
 
@@ -71,6 +75,17 @@ function main(): void {
 
   const renderer = new Renderer(gl);
   const store = new SettingsStore();
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  const applyAppearance = (): void => {
+    const resolved = resolveAppearance(store.get().appearance, systemTheme.matches);
+    document.documentElement.dataset.theme = resolved;
+    const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = resolved === 'dark' ? '#111317' : '#f3f4f6';
+  };
+  applyAppearance();
+  systemTheme.addEventListener('change', () => {
+    if (store.get().appearance === 'system') applyAppearance();
+  });
   const perf = new PerfMonitor();
   const overlay = new DebugOverlay();
   const canUseRealtime = realtimeSupported();
@@ -219,7 +234,7 @@ function main(): void {
   const panelEl = document.getElementById('panel');
   const settingsButton = document.getElementById('settings-btn');
   const panel = panelEl
-    ? new SettingsPanel(panelEl, store, () => {}, (open) => {
+    ? new SettingsPanel(panelEl, store, applyAppearance, (open) => {
         settingsButton?.setAttribute('aria-expanded', String(open));
       })
     : null;
