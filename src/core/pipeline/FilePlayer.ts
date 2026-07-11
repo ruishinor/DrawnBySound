@@ -1,12 +1,13 @@
 import { clamp } from '../util/math';
 import type { AudioGraph } from './AudioGraph';
+import type { TransportPlayer } from './TransportPlayer';
 
 /**
  * In-app file player with transport (PRD §13.3). AudioBufferSourceNode has no
  * native pause/seek, so we recreate the node at an offset. The visualizer reads
  * from the ring buffer, so it stays synchronized through pause/seek automatically.
  */
-export class FilePlayer {
+export class FilePlayer implements TransportPlayer {
   private node: AudioBufferSourceNode | null = null;
   private startCtxTime = 0;
   private offset = 0;
@@ -30,8 +31,9 @@ export class FilePlayer {
     return clamp(this.offset + (this.graph.ctx.currentTime - this.startCtxTime), 0, this.duration);
   }
 
-  play(): void {
+  async play(): Promise<void> {
     if (this.playing) return;
+    await this.graph.resume();
     this.startAt(this.offset >= this.duration ? 0 : this.offset);
   }
 

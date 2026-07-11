@@ -36,6 +36,8 @@
         letter-spacing: 0.02em;
         opacity: 0.55;
         pointer-events: none;
+        max-width: calc(100vw - 24px);
+        z-index: 5;
       }
       #controls {
         position: fixed;
@@ -50,6 +52,7 @@
         font-size: 13px;
         background: linear-gradient(#05050acc, #05050a00);
         backdrop-filter: blur(2px);
+        z-index: 4;
       }
       #controls .brand {
         font-weight: 600;
@@ -88,6 +91,7 @@
         border: 1px solid #2a2a44;
         border-radius: 999px;
         font-size: 12px;
+        z-index: 5;
       }
       #transport[hidden] {
         display: none;
@@ -121,6 +125,7 @@
         gap: 10px;
         font-size: 13px;
         box-shadow: 0 8px 30px #000a;
+        z-index: 6;
       }
       #panel[hidden] {
         display: none;
@@ -163,6 +168,46 @@
         text-transform: uppercase;
         opacity: 0.6;
       }
+      @media (max-width: 720px) {
+        #controls {
+          gap: 8px;
+          padding: max(8px, env(safe-area-inset-top)) 10px 12px;
+          font-size: 14px;
+        }
+        #controls button {
+          min-height: 40px;
+          padding: 7px 11px;
+        }
+        #controls label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 40px;
+        }
+        #status {
+          left: 8px;
+          bottom: max(8px, env(safe-area-inset-bottom));
+          max-width: calc(100vw - 32px);
+          padding: 6px 8px;
+          background: #05050acc;
+          border-radius: 6px;
+          opacity: 0.82;
+        }
+        #transport {
+          bottom: calc(48px + env(safe-area-inset-bottom));
+          max-width: calc(100vw - 32px);
+        }
+        #transport #seek {
+          width: min(42vw, 220px);
+        }
+        #panel {
+          top: 112px;
+          right: 8px;
+          width: min(260px, calc(100vw - 44px));
+          max-height: calc(100vh - 150px);
+          overflow-y: auto;
+        }
+      }
     </style>
   </head>
   <body>
@@ -186,7 +231,7 @@
       <span id="time">0:00 / 0:00</span>
     </div>
     <div id="panel" hidden></div>
-    <div id="status">Loading VibratoFlow…</div>
+    <div id="status" role="status" aria-live="polite">Loading VibratoFlow…</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

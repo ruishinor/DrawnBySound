@@ -6,6 +6,8 @@ import { SyntheticSource } from './core/capture/SyntheticSource';
 import { decodeAudioFile } from './core/capture/FileAdapter';
 import { AudioGraph } from './core/pipeline/AudioGraph';
 import { FilePlayer } from './core/pipeline/FilePlayer';
+import { MediaFilePlayer } from './core/pipeline/MediaFilePlayer';
+import type { TransportPlayer } from './core/pipeline/TransportPlayer';
 import { LiveSource } from './core/capture/LiveSource';
 import { startMic, type MicHandle } from './core/capture/MicAdapter';
 import { startSystemCapture } from './core/capture/SystemCaptureAdapter';
@@ -20,6 +22,12 @@ import { COPY } from './app/ui/copy';
 import { toRenderParams } from './core/grammar/mappings';
 import { PerfMonitor } from './core/diagnostics/PerfMonitor';
 import { downloadBlob, timestampedName } from './core/export/StillExport';
+import {
+  describeAudioEngineFailure,
+  describeDecodeFailure,
+  describeMicrophoneFailure,
+  describePlaybackFailure,
+} from './core/capture/AudioErrors';
 
 const WINDOW = 2048;
 
@@ -75,7 +83,7 @@ function main(): void {
   let liveBus: FeatureBus | null = null;
   let micHandle: MicHandle | null = null;
   let oscHandle: OscillatorHandle | null = null;
-  let player: FilePlayer | null = null;
+  let player: TransportPlayer | null = null;
 
   const left = new Float32Array(WINDOW);
   const right = new Float32Array(WINDOW);
@@ -107,6 +115,7 @@ function main(): void {
     oscHandle?.stop();
     oscHandle = null;
     liveBus = null;
+    source = SILENCE;
     if (transportEl) transportEl.hidden = true;
     // No active graph source -> no analysis (don't FFT a frozen ring).
     graph?.pauseAnalysis();
@@ -118,17 +127,41 @@ function main(): void {
     return graph;
   };
 
-  const startFile = async (buffer: AudioBuffer, label: string): Promise<void> => {
-    const g = await ensureGraph();
-    stopAll();
+  const activatePlayer = async (
+    g: AudioGraph,
+    nextPlayer: TransportPlayer,
+    label: string,
+  ): Promise<void> => {
     g.resumeAnalysis(); // fresh normalizer state per source (§15.4)
-    player = new FilePlayer(g, buffer);
-    player.play();
+    player = nextPlayer;
     liveBus = g.bus;
     source = new LiveSource(g.ring, g.ctx.sampleRate);
     if (transportEl) transportEl.hidden = false;
-    if (seekEl) seekEl.max = String(player.duration);
-    setStatus(`${APP_NAME} — ${label}`);
+    if (seekEl) {
+      seekEl.max = String(player.duration);
+      seekEl.value = '0';
+    }
+    try {
+      await player.play();
+      setStatus(`${APP_NAME} — ${label}`);
+    } catch (error) {
+      const name = error instanceof Error ? error.name : '';
+      if (name === 'NotAllowedError') {
+        setStatus(`${APP_NAME} — ${label} · ${describePlaybackFailure(error)}`);
+        console.warn('Autoplay did not start:', error);
+        return;
+      }
+      stopAll();
+      throw error;
+    }
+  };
+
+  const startDecodedFile = async (
+    g: AudioGraph,
+    buffer: AudioBuffer,
+    label: string,
+  ): Promise<void> => {
+    await activatePlayer(g, new FilePlayer(g, buffer), label);
   };
 
   // --- controls --------------------------------------------------------------
@@ -151,19 +184,32 @@ function main(): void {
   });
 
   document.getElementById('mic')?.addEventListener('click', () => {
+    setStatus(`${APP_NAME} — starting audio engine…`);
     void (async () => {
+      let g: AudioGraph;
       try {
-        const g = await ensureGraph();
+        g = await ensureGraph();
+      } catch (error) {
         stopAll();
-        g.resumeAnalysis();
+        source = new SyntheticSource();
+        setStatus(describeAudioEngineFailure(error));
+        console.error('Audio engine start failed:', error);
+        return;
+      }
+
+      stopAll();
+      g.resumeAnalysis();
+      setStatus(`${APP_NAME} — requesting microphone permission…`);
+      try {
         micHandle = await startMic(g);
         liveBus = g.bus;
         source = new LiveSource(g.ring, g.ctx.sampleRate);
         setStatus(`${APP_NAME} — listening (microphone)`);
-      } catch (err: unknown) {
-        setStatus(COPY.micDenied);
-        console.error('Mic start failed:', err);
+      } catch (error) {
+        stopAll();
         source = new SyntheticSource();
+        setStatus(describeMicrophoneFailure(error));
+        console.error('Mic start failed:', error);
       }
     })();
   });
@@ -171,22 +217,35 @@ function main(): void {
   // System / other-app audio capture (best-effort, PRD §13.4). Returns a status
   // string so the same logic backs both the button and the test hook.
   const startSystemMode = async (): Promise<string> => {
+    setStatus(`${APP_NAME} — starting system-audio capture…`);
+    let g: AudioGraph;
     try {
-      const g = await ensureGraph();
+      g = await ensureGraph();
+    } catch (error) {
       stopAll();
-      g.resumeAnalysis();
+      source = new SyntheticSource();
+      const msg = describeAudioEngineFailure(error);
+      setStatus(msg);
+      console.error('Audio engine start failed:', error);
+      return msg;
+    }
+
+    stopAll();
+    g.resumeAnalysis();
+    try {
       micHandle = await startSystemCapture(g); // shares the MicHandle shape
       liveBus = g.bus;
       source = new LiveSource(g.ring, g.ctx.sampleRate);
       const msg = `${APP_NAME} — listening (system audio)`;
       setStatus(msg);
       return msg;
-    } catch (err: unknown) {
+    } catch (error) {
       // Honest failure + fallback (PRD §13.4, §19.4): explain, suggest another mode.
-      const detail = err instanceof Error ? err.message : 'System audio capture failed.';
+      stopAll();
+      const detail = error instanceof Error ? error.message : 'System audio capture failed.';
       const msg = `${detail} ${COPY.systemCaptureLimited}`;
       setStatus(msg);
-      console.error('System capture failed:', err);
+      console.error('System capture failed:', error);
       source = new SyntheticSource();
       return msg;
     }
@@ -201,6 +260,7 @@ function main(): void {
       btn.title = cap.note;
       if (!cap.available) {
         btn.disabled = true;
+        btn.textContent = `${cap.label} unavailable`;
         btn.style.opacity = '0.45';
         btn.style.cursor = 'not-allowed';
       }
@@ -234,25 +294,54 @@ function main(): void {
   fileInput?.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;
-    setStatus(`Decoding ${file.name}…`);
+    fileInput.value = ''; // allow selecting the same file again after a failure
+    setStatus(`Opening ${file.name}…`);
+
     void (async () => {
+      let g: AudioGraph;
       try {
-        const g = await ensureGraph();
-        const buffer = await decodeAudioFile(g.ctx, file);
-        await startFile(buffer, file.name);
-      } catch (err: unknown) {
-        setStatus(COPY.decodeFailed(file.name));
-        console.error('Decode failed:', err);
+        g = await ensureGraph();
+      } catch (error) {
         stopAll();
         source = new SyntheticSource();
+        setStatus(describeAudioEngineFailure(error));
+        console.error('Audio engine start failed:', error);
+        return;
+      }
+
+      stopAll();
+      let primaryError: unknown;
+      try {
+        const buffer = await decodeAudioFile(g.ctx, file);
+        await startDecodedFile(g, buffer, file.name);
+        return;
+      } catch (error) {
+        primaryError = error;
+        console.warn('Decoded-buffer file path failed; trying browser media playback:', error);
+      }
+
+      try {
+        const fallback = await MediaFilePlayer.create(g, file);
+        await activatePlayer(g, fallback, `${file.name} · browser codec fallback`);
+      } catch (fallbackError) {
+        stopAll();
+        source = new SyntheticSource();
+        setStatus(describeDecodeFailure(file.name, fallbackError));
+        console.error('File open failed:', { primaryError, fallbackError });
       }
     })();
   });
 
   playPauseBtn?.addEventListener('click', () => {
     if (!player) return;
-    if (player.isPlaying) player.pause();
-    else player.play();
+    if (player.isPlaying) {
+      player.pause();
+      return;
+    }
+    void player.play().catch((error) => {
+      setStatus(describePlaybackFailure(error));
+      console.error('Playback start failed:', error);
+    });
   });
   seekEl?.addEventListener('input', () => {
     player?.seek(Number.parseFloat(seekEl.value));
@@ -376,7 +465,8 @@ function main(): void {
     loadUrl: (async (url: string) => {
       const g = await ensureGraph();
       const buffer = await g.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
-      await startFile(buffer, url.split('/').pop() ?? 'file');
+      stopAll();
+      await startDecodedFile(g, buffer, url.split('/').pop() ?? 'file');
       return { sampleRate: buffer.sampleRate, length: buffer.length, channels: buffer.numberOfChannels };
     }) as never,
     startOscTest: (async () => {

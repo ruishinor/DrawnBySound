@@ -18,9 +18,13 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run audit:production
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run end-to-end tests
+      - name: Run development end-to-end tests
         run: npm run test:e2e
+
+      - name: Run production-bundle audio input test
+        run: npx playwright test -c playwright.prod.config.ts

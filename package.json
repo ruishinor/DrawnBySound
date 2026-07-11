@@ -6,12 +6,14 @@
   "description": "VibratoFlow — local-first, real-time music-interpretation oscilloscope visualizer.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/verify-dist.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "npm run build && playwright test -c playwright.prod.config.ts",
+    "audit:production": "npm audit --omit=dev --audit-level=high"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

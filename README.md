@@ -16,9 +16,8 @@ react to the music in real time.
 
 ## Status
 
-Implemented milestone-by-milestone behind validation gates (see
-`.claude/plans/perform-a-comprehensive-technical-parallel-dragonfly.md`). **All milestones complete
-(web MVP):**
+The planned web-MVP milestones are implemented. Release-candidate acceptance remains pending
+production-browser and real-device validation:
 
 - **M0 — Scaffold & CI** ✅
 - **M1 — Phase 0 spike: offline file visualizer** ✅ (Stereo XY + Mono Phase XY, persistence/glow)
@@ -35,17 +34,21 @@ analysis paused on hidden tab / stop, post-AGC RMS (consistent intensity across 
 stereo-width→spread wired into geometry (PRD §18.2), a11y labels, committed Playwright E2E +
 GitHub Actions CI, dev-only automation hooks (stripped from production builds).
 
-59 unit tests + 5 E2E specs; typecheck + production build green; 60 fps with bloom; no raw audio
-leaves the device. Architecture: [docs/architecture.md](docs/architecture.md).
+67 unit tests; typecheck, production build, worklet verification, and production-dependency audit
+are green. Browser E2E and real-device acceptance remain required before release. No raw audio is
+intentionally transmitted by the application. Architecture:
+[docs/architecture.md](docs/architecture.md).
 
 ## Develop
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173 (serves COOP/COEP headers for SharedArrayBuffer)
-npm test           # unit tests (Vitest)
-npm run build      # typecheck + production build
-npm run test:e2e   # Playwright smoke E2E (first: npx playwright install chromium)
+npm run dev            # localhost:5173 with COOP/COEP headers
+npm test               # unit tests (Vitest)
+npm run build          # typecheck + build + worklet verification
+npm run test:e2e       # development-server Playwright suite
+npm run test:e2e:prod  # production-preview WAV/MP3/mic gate
+npm run audit:production
 ```
 
 ## Deployment
@@ -58,16 +61,20 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Without them the app degrades honestly to demo-only with an explanatory status. `dist/` is fully
-static with **zero production dependencies** (npm-audit findings live in the dev toolchain only
-and never ship).
+Without them the app degrades honestly to demo-only with an explanatory status. The worklet is
+emitted as a separate production JavaScript chunk and verified after every build. Imported files
+use `decodeAudioData()` first, then a local browser-media fallback for codec variants rejected by
+the decoder. `dist/` is fully static with **zero production dependencies**. npm-audit findings in
+the development toolchain do not ship with the application.
 
 ## Manual ops runbook (PowerShell)
 
 ```powershell
 git init; git add -A; git commit -m "VibratoFlow web MVP + stabilization"   # activates CI on push
 npx playwright install chromium                                             # one-time (~130 MB)
-npm run test:e2e                                                            # runs the 5 smoke specs
+npm run test:e2e                                                            # development smoke specs
+npm run test:e2e:prod                                                       # built WAV/MP3/mic gate
+npm run audit:production                                                    # shipped dependency gate
 npm audit                                                                    # dev-chain only; review before major-bumping vite/vitest
 ```
 
@@ -77,3 +84,9 @@ Bounded strictly to the PRD MVP. **Out of scope:** accounts, cloud/remote render
 transcription/interpretation, song identification, social/sharing backend, playlists, streaming
 integrations, stem separation, exact instrument ID, AI chat, prompt-to-video, marketplace, video
 editor (MVP export is still-image PNG only), and multi-device sync.
+
+## Audit
+
+The 2026-07-11 adversarial audit, implementation rationale, deferred risks, and
+dependency-ordered validation roadmap are in
+[docs/AUDIT-2026-07-11.md](docs/AUDIT-2026-07-11.md).
