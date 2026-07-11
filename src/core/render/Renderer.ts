@@ -105,7 +105,15 @@ export class Renderer {
     // 1) cur = prev * decay
     this.decayPass.run(this.cur, { uTex: this.prev.texture }, { uDecay: params.decay });
     // 2) additive trace on top
-    this.trace.draw(this.cur, positions, count, params.color, 1);
+    this.trace.draw(
+      this.cur,
+      positions,
+      count,
+      params.color,
+      params.colorMode === 'norwegian-flow' ? params.intensity : 1,
+      params.colorMode,
+      params.colorFlowTime,
+    );
     // 3) bloom (skipped when disabled)
     const bloomTex = params.bloom > 0 ? this.bloom.compute(this.cur.texture) : this.blackTex;
     // 4) tone-mapped composite to screen

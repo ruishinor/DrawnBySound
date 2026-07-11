@@ -32,9 +32,30 @@ const PALETTES: Record<string, Stop[]> = {
     { t: 0, c: [0.75, 0.8, 0.85] },
     { t: 1, c: [1.0, 1.0, 1.0] },
   ],
+  // Static fallback colors for the dedicated animated Norwegian shaders.
+  // The renderer supplies the actual moving red-white-blue fields.
+  'norwegian-flow': [
+    { t: 0, c: [0.73, 0.05, 0.18] },
+    { t: 0.5, c: [1.0, 1.0, 1.0] },
+    { t: 1, c: [0.0, 0.13, 0.36] },
+  ],
+  'norwegian-flag': [
+    { t: 0, c: [0.73, 0.05, 0.18] },
+    { t: 0.5, c: [1.0, 1.0, 1.0] },
+    { t: 1, c: [0.0, 0.13, 0.36] },
+  ],
+};
+
+const PALETTE_LABELS: Readonly<Record<string, string>> = {
+  'norwegian-flow': 'NorwegianFlow',
+  'norwegian-flag': 'NorwegianFlag',
 };
 
 export const PALETTE_IDS = Object.keys(PALETTES);
+
+export function paletteLabel(id: string): string {
+  return PALETTE_LABELS[id] ?? id;
+}
 
 function lerpStops(stops: Stop[], t: number): RGB {
   const x = clamp(t, 0, 1);
