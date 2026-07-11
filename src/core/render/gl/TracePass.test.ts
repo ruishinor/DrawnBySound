@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { traceAspectScale } from './TracePass';
 
 describe('traceAspectScale', () => {
-  it('compensates wide render targets without reducing vertical extent', () => {
-    expect(traceAspectScale(1600, 800)).toEqual([0.5, 1]);
+  it('preserves proportions and lifts occupancy on wide render targets', () => {
+    const [x, y] = traceAspectScale(1600, 800);
+    expect(x).toBeCloseTo(0.58, 6);
+    expect(y).toBeCloseTo(1.16, 6);
+    expect(x * 1600).toBeCloseTo(y * 800, 6);
   });
 
   it('keeps square and portrait targets unchanged', () => {

@@ -28,6 +28,7 @@ describe('detectCapabilities', () => {
     const caps = detectCapabilities();
     const sys = caps.find((c) => c.id === 'system');
     expect(sys?.available).toBe(false);
-    expect(sys?.note).toContain('not supported');
+    expect(sys?.label).toBe('External app');
+    expect(sys?.note).toContain('unavailable');
   });
 });

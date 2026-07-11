@@ -41,7 +41,7 @@ The detailed decisions and remaining risks are in:
 
 - **Demo:** starts immediately and needs no permission.
 - **Microphone:** requires a direct user action and browser/OS permission.
-- **Other app:** requests browser display/tab/window capture with audio. Availability depends on the browser, operating system, selected surface, and source app.
+- **External app:** requests browser display/tab/window capture with audio. It is normally unavailable in mobile browsers and still depends on the operating system, selected surface, and source app.
 - **Audio file:** uses local file selection. VibratoFlow cannot silently reopen the file after a reload.
 
 VibratoFlow remembers the preferred source and visual settings. Protected sources are deliberately not auto-started on reopen.
@@ -106,7 +106,7 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Vite development/preview uses the same headers through `vite.config.ts`; Vercel uses `vercel.json`. Without cross-origin isolation, VibratoFlow degrades to demo-only with an explicit status.
+Vite development/preview uses the same headers through `vite.config.ts`; Vercel uses `vercel.json`. The manifest link uses `crossorigin="use-credentials"` so Vercel-authenticated previews can fetch it with the deployment cookie. Vercel Toolbar injects cross-origin preview resources that do not opt into this policy; disable the Toolbar for this project or preview environment rather than weakening cross-origin isolation. Without cross-origin isolation, VibratoFlow degrades to preview-only with an explicit status.
 
 The production AudioWorklet is emitted as a separate JavaScript chunk and checked by `scripts/verify-dist.mjs`. File playback uses `decodeAudioData()` first and falls back to a local blob-backed media element for codec variants rejected by the decoder.
 
@@ -117,7 +117,7 @@ Before release, record exact browser, OS, and device versions for:
 1. Demo render and responsive layout.
 2. Microphone allow, deny, OS-blocked, track-ended, and Stop states.
 3. WAV and representative MP3 playback, seek, pause, resume, and Stop.
-4. Other app capture where the browser offers an audio track, plus no-audio and user-cancel cases.
+4. External app capture where the browser offers an audio track, plus unsupported-mobile, no-audio, and user-cancel cases.
 5. Persistence of visual settings, custom colour, reduced motion, and preferred source.
 6. Portrait/landscape, safe areas, no horizontal overflow, and settings keyboard behavior.
 7. 15–30 minute thermal/performance observation on the target Samsung device.
@@ -125,7 +125,7 @@ Before release, record exact browser, OS, and device versions for:
 ## Test status for this deliverable
 
 - Typecheck: pass.
-- Unit tests: pass — 14 files, 72 tests.
+- Unit tests: pass — current total is verified by `npm test`.
 - Production build and AudioWorklet verifier: pass.
 - Production dependency audit: pass — zero production findings.
-- Playwright E2E: authored/updated, but not executed successfully in the implementation environment because browser download failed and the available system Chromium was administrator-blocked from local URLs.
+- Playwright E2E: development and production-bundle suites pass on the verified baseline.

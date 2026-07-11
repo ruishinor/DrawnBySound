@@ -53,9 +53,18 @@ describe('SettingsStore persistence', () => {
     const first = new SettingsStore();
     expect(first.get().palette).toBe('mono');
     expect(first.get().appearance).toBe('system');
+    expect(first.get().interfaceAccent).toBe('graphite');
     expect(first.wasRestored()).toBe(false);
 
-    first.update({ palette: 'ice', sensitivity: 1.7, customColor: '#336699', appearance: 'dark' });
+    first.update({
+      palette: 'ice',
+      sensitivity: 1.7,
+      customColor: '#336699',
+      appearance: 'dark',
+      interfaceAccent: 'moss',
+      customInterfaceAccent: '#557755',
+      useCustomInterfaceAccent: true,
+    });
     const second = new SettingsStore();
 
     expect(second.wasRestored()).toBe(true);
@@ -64,6 +73,9 @@ describe('SettingsStore persistence', () => {
       sensitivity: 1.7,
       customColor: '#336699',
       appearance: 'dark',
+      interfaceAccent: 'moss',
+      customInterfaceAccent: '#557755',
+      useCustomInterfaceAccent: true,
     });
   });
 
@@ -116,15 +128,28 @@ describe('SettingsStore persistence', () => {
     expect(new SettingsStore().get().palette).toBe('warm-amber');
   });
 
-  it('preserves the preferred source when visual settings are reset', () => {
+  it('preserves interface and source preferences when visual settings are reset', () => {
     const store = new SettingsStore();
-    store.update({ preferredSource: 'mic', appearance: 'dark', palette: 'neon', bloom: 1.4 });
+    store.update({
+      preferredSource: 'mic',
+      appearance: 'dark',
+      interfaceAccent: 'plum',
+      customInterfaceAccent: '#765476',
+      useCustomInterfaceAccent: true,
+      palette: 'neon',
+      bloom: 1.4,
+    });
     store.reset();
 
-    expect(store.get().preferredSource).toBe('mic');
-    expect(store.get().appearance).toBe('dark');
-    expect(store.get().palette).toBe(DEFAULT_SETTINGS.palette);
-    expect(store.get().bloom).toBe(DEFAULT_SETTINGS.bloom);
+    expect(store.get()).toMatchObject({
+      preferredSource: 'mic',
+      appearance: 'dark',
+      interfaceAccent: 'plum',
+      customInterfaceAccent: '#765476',
+      useCustomInterfaceAccent: true,
+      palette: DEFAULT_SETTINGS.palette,
+      bloom: DEFAULT_SETTINGS.bloom,
+    });
   });
 
   it('ignores malformed values and clamps numeric storage values', () => {
@@ -136,6 +161,9 @@ describe('SettingsStore persistence', () => {
         customColor: 'javascript:alert(1)',
         preferredSource: 'camera',
         appearance: 'sepia',
+        interfaceAccent: 'neon',
+        customInterfaceAccent: 'red',
+        useCustomInterfaceAccent: 'yes',
         lowPower: 'yes',
       }),
     );
@@ -146,6 +174,9 @@ describe('SettingsStore persistence', () => {
     expect(settings.customColor).toBe(DEFAULT_SETTINGS.customColor);
     expect(settings.preferredSource).toBe(DEFAULT_SETTINGS.preferredSource);
     expect(settings.appearance).toBe(DEFAULT_SETTINGS.appearance);
+    expect(settings.interfaceAccent).toBe(DEFAULT_SETTINGS.interfaceAccent);
+    expect(settings.customInterfaceAccent).toBe(DEFAULT_SETTINGS.customInterfaceAccent);
+    expect(settings.useCustomInterfaceAccent).toBe(false);
     expect(settings.lowPower).toBe(false);
   });
 });
@@ -158,6 +189,9 @@ describe('sanitizeSettings', () => {
         preferredSource: 'system',
         reducedMotion: true,
         appearance: 'light',
+        interfaceAccent: 'clay',
+        customInterfaceAccent: '#AABBCC',
+        useCustomInterfaceAccent: true,
         mode: 'stereo-xy',
       }),
     ).toEqual({
@@ -165,6 +199,9 @@ describe('sanitizeSettings', () => {
       preferredSource: 'system',
       reducedMotion: true,
       appearance: 'light',
+      interfaceAccent: 'clay',
+      customInterfaceAccent: '#aabbcc',
+      useCustomInterfaceAccent: true,
       mode: 'stereo-xy',
     });
   });

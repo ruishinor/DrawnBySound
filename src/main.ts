@@ -78,9 +78,14 @@ function main(): void {
   const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
   const applyAppearance = (): void => {
     const resolved = resolveAppearance(store.get().appearance, systemTheme.matches);
+    const settings = store.get();
     document.documentElement.dataset.theme = resolved;
+    document.documentElement.dataset.accent = settings.useCustomInterfaceAccent
+      ? 'custom'
+      : settings.interfaceAccent;
+    document.documentElement.style.setProperty('--accent-custom', settings.customInterfaceAccent);
     const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = resolved === 'dark' ? '#111317' : '#f3f4f6';
+    if (themeColor) themeColor.content = resolved === 'dark' ? '#1b1d1f' : '#dfe1df';
   };
   applyAppearance();
   systemTheme.addEventListener('change', () => {
@@ -99,9 +104,9 @@ function main(): void {
   }
 
   const sourceNames: Readonly<Record<SourcePreference, { kicker: string; title: string }>> = {
-    demo: { kicker: 'Demo', title: 'Generated signal' },
+    demo: { kicker: 'Preview', title: 'Sample signal' },
     mic: { kicker: 'Microphone', title: 'Listening to the room' },
-    system: { kicker: 'Other app', title: 'Shared audio' },
+    system: { kicker: 'External app', title: 'Shared audio' },
     file: { kicker: 'Audio file', title: 'Local playback' },
   };
 
@@ -246,7 +251,7 @@ function main(): void {
     stopAll();
     source = new SyntheticSource();
     setSourcePresentation('demo', undefined, true);
-    setStatus(`${APP_NAME} — demo signal`);
+    setStatus(`${APP_NAME} — sample signal`);
   });
 
   // Explicit stop/listening state (PRD §19.1, §23-14): halt all capture and
@@ -318,16 +323,26 @@ function main(): void {
       source = new LiveSource(g.ring, g.ctx.sampleRate);
       watchCaptureEnd(micHandle, 'Shared audio');
       setSourcePresentation('system', undefined, true);
-      const msg = `${APP_NAME} — listening (other app / shared audio)`;
+      const msg = `${APP_NAME} — listening (external app / shared audio)`;
       setStatus(msg);
       return msg;
     } catch (error) {
-      // Honest failure + fallback (PRD §13.4, §19.4): explain, suggest another mode.
+      // Cancellation/denial is an expected outcome of the browser share picker.
       stopAll();
-      const detail = error instanceof Error ? error.message : 'System audio capture failed.';
+      const errorName = error instanceof Error ? error.name : '';
+      if (errorName === 'NotAllowedError') {
+        const msg = `${APP_NAME} — external app sharing cancelled`;
+        setStatus(msg);
+        source = new SyntheticSource();
+        setSourcePresentation('demo');
+        return msg;
+      }
+
+      // Honest failure + fallback (PRD §13.4, §19.4): explain, suggest another mode.
+      const detail = error instanceof Error ? error.message : 'External app audio capture failed.';
       const msg = `${detail} ${COPY.systemCaptureLimited}`;
       setStatus(msg);
-      console.error('System capture failed:', error);
+      console.error('External app capture failed:', error);
       source = new SyntheticSource();
       setSourcePresentation('demo');
       return msg;
@@ -347,7 +362,7 @@ function main(): void {
         const title = button.querySelector('span');
         const detail = button.querySelector('small');
         if (title) title.textContent = cap.label;
-        if (detail) detail.textContent = 'Unavailable here';
+        if (detail) detail.textContent = cap.id === 'system' ? 'Desktop browser only' : 'Unavailable here';
       }
     }
   }
@@ -639,7 +654,7 @@ function main(): void {
 
   if (canUseRealtime) {
     if (preferredSource === 'demo') {
-      setStatus(`${APP_NAME} — demo signal · preferences ${store.wasRestored() ? 'restored' : 'ready'}`);
+      setStatus(`${APP_NAME} — sample signal · preferences ${store.wasRestored() ? 'restored' : 'ready'}`);
     } else {
       setStatus(`${APP_NAME} — ${sourceNames[preferredSource].kicker.toLowerCase()} remembered · tap to reconnect`);
     }

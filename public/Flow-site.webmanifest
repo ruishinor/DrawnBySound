@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#05050a",
-  "theme_color": "#111317",
+  "background_color": "#1b1d1f",
+  "theme_color": "#1b1d1f",
   "icons": [
     {
       "src": "/Flow-icon-192.png",

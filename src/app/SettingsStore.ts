@@ -1,6 +1,7 @@
 /** User preferences. Persisted locally; no account or remote sync. */
 export type SourcePreference = 'demo' | 'mic' | 'system' | 'file';
 export type AppearancePreference = 'system' | 'light' | 'dark';
+export type InterfaceAccent = 'graphite' | 'moss' | 'plum' | 'clay' | 'slate';
 
 export interface Settings {
   inputGain: number; // manual amplitude applied to samples
@@ -17,6 +18,9 @@ export interface Settings {
   useCustomColor: boolean;
   preferredSource: SourcePreference; // remembered, never auto-started
   appearance: AppearancePreference; // system, light, or dark interface
+  interfaceAccent: InterfaceAccent;
+  customInterfaceAccent: string; // #rrggbb, applied only as a restrained accent
+  useCustomInterfaceAccent: boolean;
   lowPower: boolean;
   reducedMotion: boolean;
   showDebug: boolean;
@@ -37,6 +41,9 @@ export const DEFAULT_SETTINGS: Settings = {
   useCustomColor: false,
   preferredSource: 'demo',
   appearance: 'system',
+  interfaceAccent: 'graphite',
+  customInterfaceAccent: '#666b70',
+  useCustomInterfaceAccent: false,
   lowPower: false,
   reducedMotion: false,
   showDebug: false,
@@ -48,6 +55,7 @@ const LEGACY_KEY = 'vibratoflow.settings.v1';
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu;
 const SOURCE_VALUES = new Set<SourcePreference>(['demo', 'mic', 'system', 'file']);
 const APPEARANCE_VALUES = new Set<AppearancePreference>(['system', 'light', 'dark']);
+const INTERFACE_ACCENT_VALUES = new Set<InterfaceAccent>(['graphite', 'moss', 'plum', 'clay', 'slate']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -110,7 +118,13 @@ export function sanitizeSettings(value: unknown): Partial<Settings> {
   if (typeof value.appearance === 'string' && APPEARANCE_VALUES.has(value.appearance as AppearancePreference)) {
     result.appearance = value.appearance as AppearancePreference;
   }
-  for (const key of ['useCustomColor', 'lowPower', 'reducedMotion', 'showDebug'] as const) {
+  if (typeof value.interfaceAccent === 'string' && INTERFACE_ACCENT_VALUES.has(value.interfaceAccent as InterfaceAccent)) {
+    result.interfaceAccent = value.interfaceAccent as InterfaceAccent;
+  }
+  if (typeof value.customInterfaceAccent === 'string' && HEX_COLOR.test(value.customInterfaceAccent)) {
+    result.customInterfaceAccent = value.customInterfaceAccent.toLowerCase();
+  }
+  for (const key of ['useCustomColor', 'useCustomInterfaceAccent', 'lowPower', 'reducedMotion', 'showDebug'] as const) {
     if (typeof value[key] === 'boolean') result[key] = value[key];
   }
   return result;
@@ -151,8 +165,21 @@ export class SettingsStore {
 
   /** Reset visual tuning while preserving interface and source preferences. */
   reset(): Readonly<Settings> {
-    const { preferredSource, appearance } = this.settings;
-    this.settings = { ...DEFAULT_SETTINGS, preferredSource, appearance };
+    const {
+      preferredSource,
+      appearance,
+      interfaceAccent,
+      customInterfaceAccent,
+      useCustomInterfaceAccent,
+    } = this.settings;
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      preferredSource,
+      appearance,
+      interfaceAccent,
+      customInterfaceAccent,
+      useCustomInterfaceAccent,
+    };
     this.save();
     return this.settings;
   }
