@@ -1,92 +1,131 @@
 # VibratoFlow
 
-**Real-time oscilloscope art that listens to music, detects its musical character, and turns it
-into living geometry on your device.**
+**Music, drawn live — a local-first oscilloscope visualizer for microphone, audio files, and supported shared audio.**
 
-VibratoFlow (finalized name; the source PRD used the working title *OscilloFlow*) is a
-**local-first, real-time music-interpretation oscilloscope visualizer**. It captures live or
-imported audio, extracts musical/acoustic features locally, and renders high-fidelity
-oscilloscope-style visuals (XY traces, Lissajous figures, phosphor persistence, glow, bloom) that
-react to the music in real time.
+VibratoFlow captures or imports audio, extracts acoustic features locally, and renders responsive XY/Lissajous-style geometry through WebGL2. It has no account system, no analytics, and no intentional raw-audio upload.
 
-- **Local-first** — raw audio never leaves the device by default. No accounts, no cloud, no lyrics.
-- **Honest capability model** — available listening modes depend on your device and OS.
-- **Web prototype first** — TypeScript + Web Audio API/AudioWorklet + WebGL2 (PRD §16.2, Phase 0),
-  with a DOM-free `core/` engine kept portable for later native adapters.
+## Current release state
 
-## Status
+The audio/rendering core and the 2026-07-11 UI/persistence pass are implemented. The repository is a **release candidate**, not an unconditional production sign-off. Typecheck, unit tests, production build, AudioWorklet bundle verification, and the production-dependency audit pass. Browser E2E and exact-device acceptance remain required.
 
-The planned web-MVP milestones are implemented. Release-candidate acceptance remains pending
-production-browser and real-device validation:
+Implemented:
 
-- **M0 — Scaffold & CI** ✅
-- **M1 — Phase 0 spike: offline file visualizer** ✅ (Stereo XY + Mono Phase XY, persistence/glow)
-- **M2 — Real-time core + AGC** ✅ (AudioWorklet, lock-free ring buffer, mic)
-- **M3 — Feature extraction** ✅ (FFT worker: bands, centroid, flux, onset, stereo width)
-- **M4 — Visual grammar + 5 modes + presets + settings** ✅ (bloom, 8 presets, persisted settings)
-- **M5 — Transport + still export + diagnostics + failure states** ✅
-- **M6 — Interpretation layer** ✅ (broad timbre classifier + vocal presence, off-thread)
-- **M7 — System capture (best-effort) + MVP acceptance** ✅
+- Demo signal, microphone, audio-file playback, and best-effort Other app/shared-audio capture.
+- Web Audio API + AudioWorklet preprocessing.
+- SharedArrayBuffer ring buffers and off-main-thread feature extraction.
+- WebGL2 trace, persistence, bloom, and PNG frame export.
+- Responsive product shell with a warm neutral interface around the dark visual stage.
+- Versioned local settings persistence with migration, validation, and tests.
+- Remembered source preference without silently renewing permissions or reopening files.
+- Named colour sets, calm presets, and a native custom-colour picker.
+- Labelled form fields, selected-source semantics, live status, and keyboard-operable settings.
+- Strict Vite development port alignment to prevent the reported HMR 5174/5173 mismatch.
 
-**Post-MVP stabilization pass (release-candidate hardening):** cross-origin-isolation detection
-with honest demo-only degradation, explicit ■ Stop control, `prefers-reduced-motion` default,
-analysis paused on hidden tab / stop, post-AGC RMS (consistent intensity across sources),
-stereo-width→spread wired into geometry (PRD §18.2), a11y labels, committed Playwright E2E +
-GitHub Actions CI, dev-only automation hooks (stripped from production builds).
+Not implemented or not promised:
 
-67 unit tests; typecheck, production build, worklet verification, and production-dependency audit
-are green. Browser E2E and real-device acceptance remain required before release. No raw audio is
-intentionally transmitted by the application. Architecture:
-[docs/architecture.md](docs/architecture.md).
+- Universal capture of Spotify, YouTube, Instagram, BlackPlayer, or every device audio stream.
+- Native Android AudioPlaybackCapture integration.
+- Live lyrics/transcription.
+- Service-worker-backed offline startup.
+- Accounts, cloud rendering, playlists, social backend, or remote audio processing.
 
-## Develop
+The detailed decisions and remaining risks are in:
 
-```bash
-npm install
-npm run dev            # localhost:5173 with COOP/COEP headers
-npm test               # unit tests (Vitest)
-npm run build          # typecheck + build + worklet verification
-npm run test:e2e       # development-server Playwright suite
-npm run test:e2e:prod  # production-preview WAV/MP3/mic gate
+- [Adversarial audit and implementation report](docs/AUDIT-AND-IMPLEMENTATION-2026-07-11.md)
+- [Other-app audio and live-lyrics viability](docs/FEATURE-VIABILITY-2026-07-11.md)
+- [Architecture](docs/architecture.md)
+- [Manual acceptance checklist](docs/MANUAL-ACCEPTANCE-2026-07-11.md)
+- [Earlier production-audio stabilization audit](docs/AUDIT-2026-07-11.md)
+
+## Source behavior
+
+- **Demo:** starts immediately and needs no permission.
+- **Microphone:** requires a direct user action and browser/OS permission.
+- **Other app:** requests browser display/tab/window capture with audio. Availability depends on the browser, operating system, selected surface, and source app.
+- **Audio file:** uses local file selection. VibratoFlow cannot silently reopen the file after a reload.
+
+VibratoFlow remembers the preferred source and visual settings. Protected sources are deliberately not auto-started on reopen.
+
+## Development prerequisites
+
+- Node.js 22 LTS or a repository-approved equivalent.
+- npm.
+- A Chromium browser installed through Playwright for E2E testing.
+- A host that can set COOP/COEP headers for the SharedArrayBuffer pipeline.
+
+## Dependency-ordered local validation
+
+PowerShell, from the repository root:
+
+```powershell
+npm ci
+if ($LASTEXITCODE -ne 0) { throw "STOP: npm ci failed." }
+
+npm run typecheck
+if ($LASTEXITCODE -ne 0) { throw "STOP: typecheck failed." }
+
+npm test
+if ($LASTEXITCODE -ne 0) { throw "STOP: unit tests failed." }
+
+npm run build
+if ($LASTEXITCODE -ne 0) { throw "STOP: production build or worklet verification failed." }
+
 npm run audit:production
+if ($LASTEXITCODE -ne 0) { throw "STOP: production dependency audit failed." }
 ```
+
+Install Playwright Chromium once, then run browser gates:
+
+```powershell
+npx playwright install chromium
+if ($LASTEXITCODE -ne 0) { throw "STOP: Playwright Chromium installation failed." }
+
+npm run test:e2e
+if ($LASTEXITCODE -ne 0) { throw "STOP: development E2E failed." }
+
+npm run test:e2e:prod
+if ($LASTEXITCODE -ne 0) { throw "STOP: production-preview E2E failed." }
+```
+
+Only after those gates pass, start manual review:
+
+```powershell
+npm run dev
+```
+
+Expected URL: `http://localhost:5174/`.
+
+The dev server uses `strictPort: true`. If 5174 is occupied, it exits instead of silently moving to 5173 and breaking HMR through a mismatched browser/proxy origin.
 
 ## Deployment
 
-The real-time pipeline requires **cross-origin isolation** (`SharedArrayBuffer`). The host MUST
-send these headers on every response:
+The real-time pipeline requires cross-origin isolation because it uses `SharedArrayBuffer`. The production host must send these headers on every relevant response:
 
-```
+```text
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Without them the app degrades honestly to demo-only with an explanatory status. The worklet is
-emitted as a separate production JavaScript chunk and verified after every build. Imported files
-use `decodeAudioData()` first, then a local browser-media fallback for codec variants rejected by
-the decoder. `dist/` is fully static with **zero production dependencies**. npm-audit findings in
-the development toolchain do not ship with the application.
+Vite development/preview uses the same headers through `vite.config.ts`; Vercel uses `vercel.json`. Without cross-origin isolation, VibratoFlow degrades to demo-only with an explicit status.
 
-## Manual ops runbook (PowerShell)
+The production AudioWorklet is emitted as a separate JavaScript chunk and checked by `scripts/verify-dist.mjs`. File playback uses `decodeAudioData()` first and falls back to a local blob-backed media element for codec variants rejected by the decoder.
 
-```powershell
-git init; git add -A; git commit -m "VibratoFlow web MVP + stabilization"   # activates CI on push
-npx playwright install chromium                                             # one-time (~130 MB)
-npm run test:e2e                                                            # development smoke specs
-npm run test:e2e:prod                                                       # built WAV/MP3/mic gate
-npm run audit:production                                                    # shipped dependency gate
-npm audit                                                                    # dev-chain only; review before major-bumping vite/vitest
-```
+## Manual acceptance minimum
 
-## Scope
+Before release, record exact browser, OS, and device versions for:
 
-Bounded strictly to the PRD MVP. **Out of scope:** accounts, cloud/remote rendering, lyric
-transcription/interpretation, song identification, social/sharing backend, playlists, streaming
-integrations, stem separation, exact instrument ID, AI chat, prompt-to-video, marketplace, video
-editor (MVP export is still-image PNG only), and multi-device sync.
+1. Demo render and responsive layout.
+2. Microphone allow, deny, OS-blocked, track-ended, and Stop states.
+3. WAV and representative MP3 playback, seek, pause, resume, and Stop.
+4. Other app capture where the browser offers an audio track, plus no-audio and user-cancel cases.
+5. Persistence of visual settings, custom colour, reduced motion, and preferred source.
+6. Portrait/landscape, safe areas, no horizontal overflow, and settings keyboard behavior.
+7. 15–30 minute thermal/performance observation on the target Samsung device.
 
-## Audit
+## Test status for this deliverable
 
-The 2026-07-11 adversarial audit, implementation rationale, deferred risks, and
-dependency-ordered validation roadmap are in
-[docs/AUDIT-2026-07-11.md](docs/AUDIT-2026-07-11.md).
+- Typecheck: pass.
+- Unit tests: pass — 14 files, 72 tests.
+- Production build and AudioWorklet verifier: pass.
+- Production dependency audit: pass — zero production findings.
+- Playwright E2E: authored/updated, but not executed successfully in the implementation environment because browser download failed and the available system Chromium was administrator-blocked from local URLs.

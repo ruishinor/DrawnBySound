@@ -1,3 +1,4 @@
+import './app/ui/app.css';
 import { APP_NAME } from './app/config';
 import { Renderer } from './core/render/Renderer';
 import { MODE_BY_ID, StereoXY, type ModeContext } from './core/render/modes';
@@ -15,7 +16,7 @@ import { detectCapabilities, realtimeSupported } from './core/capture/Capabiliti
 import { startOscillator, type OscillatorHandle } from './core/capture/OscillatorSource';
 import type { FeatureBus } from './core/pipeline/FeatureBus';
 import { createFeatureFrame } from './core/features/FeatureFrame';
-import { SettingsStore } from './app/SettingsStore';
+import { SettingsStore, type SourcePreference } from './app/SettingsStore';
 import { SettingsPanel } from './app/ui/SettingsPanel';
 import { DebugOverlay } from './app/ui/DebugOverlay';
 import { COPY } from './app/ui/copy';
@@ -73,12 +74,50 @@ function main(): void {
   const perf = new PerfMonitor();
   const overlay = new DebugOverlay();
   const canUseRealtime = realtimeSupported();
+  const sourceKicker = document.getElementById('source-kicker');
+  const sourceTitle = document.getElementById('source-title');
+  const fileLabel = document.getElementById('file-label');
+  const sourceButtons = new Map<SourcePreference, HTMLButtonElement>();
+  for (const id of ['demo', 'mic', 'system', 'file'] as const) {
+    const element = document.getElementById(id === 'file' ? 'file-trigger' : id);
+    if (element instanceof HTMLButtonElement) sourceButtons.set(id, element);
+  }
+
+  const sourceNames: Readonly<Record<SourcePreference, { kicker: string; title: string }>> = {
+    demo: { kicker: 'Demo', title: 'Generated signal' },
+    mic: { kicker: 'Microphone', title: 'Listening to the room' },
+    system: { kicker: 'Other app', title: 'Shared audio' },
+    file: { kicker: 'Audio file', title: 'Local playback' },
+  };
+
+  const markPreferredSource = (preferred: SourcePreference): void => {
+    for (const [id, button] of sourceButtons) {
+      button.dataset.preferred = String(id === preferred);
+    }
+  };
+
+  const setSourcePresentation = (
+    active: SourcePreference | null,
+    title?: string,
+    remember = false,
+  ): void => {
+    for (const [id, button] of sourceButtons) {
+      button.setAttribute('aria-pressed', String(id === active));
+    }
+    if (sourceKicker) sourceKicker.textContent = active ? sourceNames[active].kicker : 'Ready';
+    if (sourceTitle) sourceTitle.textContent = title ?? (active ? sourceNames[active].title : 'Choose a source');
+    if (remember && active) {
+      store.update({ preferredSource: active });
+      markPreferredSource(active);
+    }
+  };
 
   // A source that reports no audio: the trace decays to black (stopped state).
   const SILENCE: AudioFrameSource = { sampleRate: 48000, channels: 2, read: () => false };
 
   // --- session state ---------------------------------------------------------
-  let source: AudioFrameSource = new SyntheticSource();
+  const preferredSource = store.get().preferredSource;
+  let source: AudioFrameSource = preferredSource === 'demo' ? new SyntheticSource() : SILENCE;
   let graph: AudioGraph | null = null;
   let liveBus: FeatureBus | null = null;
   let micHandle: MicHandle | null = null;
@@ -127,6 +166,16 @@ function main(): void {
     return graph;
   };
 
+  const watchCaptureEnd = (handle: MicHandle, label: string): void => {
+    const track = handle.stream.getAudioTracks()[0];
+    track?.addEventListener('ended', () => {
+      if (micHandle !== handle) return;
+      stopAll();
+      setSourcePresentation(null, `${label} ended`);
+      setStatus(`${APP_NAME} — ${label.toLowerCase()} ended · choose a source to reconnect`);
+    });
+  };
+
   const activatePlayer = async (
     g: AudioGraph,
     nextPlayer: TransportPlayer,
@@ -143,10 +192,12 @@ function main(): void {
     }
     try {
       await player.play();
+      setSourcePresentation('file', label, true);
       setStatus(`${APP_NAME} — ${label}`);
     } catch (error) {
       const name = error instanceof Error ? error.name : '';
       if (name === 'NotAllowedError') {
+        setSourcePresentation('file', label, true);
         setStatus(`${APP_NAME} — ${label} · ${describePlaybackFailure(error)}`);
         console.warn('Autoplay did not start:', error);
         return;
@@ -166,12 +217,20 @@ function main(): void {
 
   // --- controls --------------------------------------------------------------
   const panelEl = document.getElementById('panel');
-  const panel = panelEl ? new SettingsPanel(panelEl, store, () => {}) : null;
-  document.getElementById('settings-btn')?.addEventListener('click', () => panel?.toggle());
+  const settingsButton = document.getElementById('settings-btn');
+  const panel = panelEl
+    ? new SettingsPanel(panelEl, store, () => {}, (open) => {
+        settingsButton?.setAttribute('aria-expanded', String(open));
+      })
+    : null;
+  settingsButton?.addEventListener('click', () => {
+    panel?.toggle(settingsButton instanceof HTMLElement ? settingsButton : undefined);
+  });
 
   document.getElementById('demo')?.addEventListener('click', () => {
     stopAll();
     source = new SyntheticSource();
+    setSourcePresentation('demo', undefined, true);
     setStatus(`${APP_NAME} — demo signal`);
   });
 
@@ -180,6 +239,7 @@ function main(): void {
   document.getElementById('stop')?.addEventListener('click', () => {
     stopAll();
     source = SILENCE;
+    setSourcePresentation(null, 'Not listening');
     setStatus(`${APP_NAME} — stopped · not listening`);
   });
 
@@ -192,6 +252,7 @@ function main(): void {
       } catch (error) {
         stopAll();
         source = new SyntheticSource();
+        setSourcePresentation('demo');
         setStatus(describeAudioEngineFailure(error));
         console.error('Audio engine start failed:', error);
         return;
@@ -204,10 +265,13 @@ function main(): void {
         micHandle = await startMic(g);
         liveBus = g.bus;
         source = new LiveSource(g.ring, g.ctx.sampleRate);
+        watchCaptureEnd(micHandle, 'Microphone');
+        setSourcePresentation('mic', undefined, true);
         setStatus(`${APP_NAME} — listening (microphone)`);
       } catch (error) {
         stopAll();
         source = new SyntheticSource();
+        setSourcePresentation('demo');
         setStatus(describeMicrophoneFailure(error));
         console.error('Mic start failed:', error);
       }
@@ -224,6 +288,7 @@ function main(): void {
     } catch (error) {
       stopAll();
       source = new SyntheticSource();
+      setSourcePresentation('demo');
       const msg = describeAudioEngineFailure(error);
       setStatus(msg);
       console.error('Audio engine start failed:', error);
@@ -236,7 +301,9 @@ function main(): void {
       micHandle = await startSystemCapture(g); // shares the MicHandle shape
       liveBus = g.bus;
       source = new LiveSource(g.ring, g.ctx.sampleRate);
-      const msg = `${APP_NAME} — listening (system audio)`;
+      watchCaptureEnd(micHandle, 'Shared audio');
+      setSourcePresentation('system', undefined, true);
+      const msg = `${APP_NAME} — listening (other app / shared audio)`;
       setStatus(msg);
       return msg;
     } catch (error) {
@@ -247,6 +314,7 @@ function main(): void {
       setStatus(msg);
       console.error('System capture failed:', error);
       source = new SyntheticSource();
+      setSourcePresentation('demo');
       return msg;
     }
   };
@@ -255,14 +323,16 @@ function main(): void {
   // Capability-honest UI (PRD §11, §13.1): disable unsupported modes with an
   // explanation rather than misrepresenting them.
   for (const cap of detectCapabilities()) {
-    const btn = document.getElementById(cap.id === 'system' ? 'system' : cap.id === 'mic' ? 'mic' : '');
-    if (btn instanceof HTMLButtonElement) {
-      btn.title = cap.note;
+    const buttonId = cap.id === 'system' ? 'system' : cap.id === 'mic' ? 'mic' : '';
+    const button = document.getElementById(buttonId);
+    if (button instanceof HTMLButtonElement) {
+      button.title = cap.note;
       if (!cap.available) {
-        btn.disabled = true;
-        btn.textContent = `${cap.label} unavailable`;
-        btn.style.opacity = '0.45';
-        btn.style.cursor = 'not-allowed';
+        button.disabled = true;
+        const title = button.querySelector('span');
+        const detail = button.querySelector('small');
+        if (title) title.textContent = cap.label;
+        if (detail) detail.textContent = 'Unavailable here';
       }
     }
   }
@@ -270,13 +340,12 @@ function main(): void {
   // The real-time pipeline needs cross-origin isolation (SAB). On hosts without
   // COOP/COEP headers, degrade honestly: demo only, with an explanation (§14.3).
   if (!canUseRealtime) {
-    for (const id of ['mic', 'system', 'file']) {
+    for (const id of ['mic', 'system', 'file', 'file-trigger']) {
       const el = document.getElementById(id);
       if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
         el.disabled = true;
         el.title =
           'Live analysis needs cross-origin isolation (COOP/COEP headers). See README → Deployment.';
-        el.style.opacity = '0.45';
       }
     }
     setStatus(`${APP_NAME} — demo only · this host lacks COOP/COEP headers for live analysis`);
@@ -291,9 +360,11 @@ function main(): void {
   });
 
   const fileInput = document.getElementById('file') as HTMLInputElement | null;
+  document.getElementById('file-trigger')?.addEventListener('click', () => fileInput?.click());
   fileInput?.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;
+    if (fileLabel) fileLabel.textContent = file.name;
     fileInput.value = ''; // allow selecting the same file again after a failure
     setStatus(`Opening ${file.name}…`);
 
@@ -304,6 +375,7 @@ function main(): void {
       } catch (error) {
         stopAll();
         source = new SyntheticSource();
+        setSourcePresentation('demo');
         setStatus(describeAudioEngineFailure(error));
         console.error('Audio engine start failed:', error);
         return;
@@ -326,6 +398,7 @@ function main(): void {
       } catch (fallbackError) {
         stopAll();
         source = new SyntheticSource();
+        setSourcePresentation('demo');
         setStatus(describeDecodeFailure(file.name, fallbackError));
         console.error('File open failed:', { primaryError, fallbackError });
       }
@@ -413,7 +486,11 @@ function main(): void {
 
     // Transport UI sync.
     if (player && transportEl && !transportEl.hidden) {
-      if (playPauseBtn) playPauseBtn.textContent = player.isPlaying ? '❚❚' : '▶';
+      if (playPauseBtn) {
+        const playing = player.isPlaying;
+        playPauseBtn.textContent = playing ? 'Pause' : 'Play';
+        playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+      }
       if (seekEl && document.activeElement !== seekEl) seekEl.value = String(player.currentTime);
       if (timeEl) timeEl.textContent = `${fmtTime(player.currentTime)} / ${fmtTime(player.duration)}`;
     }
@@ -461,6 +538,7 @@ function main(): void {
     loadDemo: () => {
       stopAll();
       source = new SyntheticSource();
+      setSourcePresentation('demo');
     },
     loadUrl: (async (url: string) => {
       const g = await ensureGraph();
@@ -533,8 +611,23 @@ function main(): void {
     }) as never,
   };
 
+  markPreferredSource(preferredSource);
+  if (!canUseRealtime) {
+    source = new SyntheticSource();
+    setSourcePresentation('demo');
+  } else if (preferredSource === 'demo') {
+    setSourcePresentation('demo');
+  } else {
+    const remembered = sourceNames[preferredSource];
+    setSourcePresentation(null, `Reconnect ${remembered.kicker.toLowerCase()}`);
+  }
+
   if (canUseRealtime) {
-    setStatus(`${APP_NAME} — demo signal · WebGL2${renderer.hdr ? ' · HDR' : ''}`);
+    if (preferredSource === 'demo') {
+      setStatus(`${APP_NAME} — demo signal · preferences ${store.wasRestored() ? 'restored' : 'ready'}`);
+    } else {
+      setStatus(`${APP_NAME} — ${sourceNames[preferredSource].kicker.toLowerCase()} remembered · tap to reconnect`);
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 import { clamp, smoothstep } from '../util/math';
-import { paletteColor } from './palettes';
+import { customColor, paletteColor } from './palettes';
 import type { Settings } from '../../app/SettingsStore';
 import type { FeatureFrame, Category } from '../features/FeatureFrame';
 import type { RenderParams } from '../render/RenderParams';
@@ -66,11 +66,13 @@ export function toRenderParams(frame: FeatureFrame, s: Settings, timeSec = 0): R
     burst *= 1 - 0.3 * voice;
   }
 
-  const color = paletteColor(s.palette, frame.centroid, intensity);
+  const color = s.useCustomColor
+    ? customColor(s.customColor, intensity)
+    : paletteColor(s.palette, frame.centroid, intensity);
   const colorMode =
-    s.palette === 'norwegian-flow'
+    !s.useCustomColor && s.palette === 'norwegian-flow'
       ? 'norwegian-flow'
-      : s.palette === 'norwegian-flag'
+      : !s.useCustomColor && s.palette === 'norwegian-flag'
         ? 'norwegian-flag'
         : 'solid';
   // Reduced-motion freezes only the palette animation. Geometry and all other

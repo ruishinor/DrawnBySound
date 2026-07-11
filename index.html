@@ -4,234 +4,88 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>VibratoFlow</title>
-    <meta name="theme-color" content="#07051a" />
+    <meta name="description" content="A private, real-time music visualizer for microphone, files, and supported shared audio." />
+    <meta name="theme-color" content="#e7e2d8" />
     <link rel="icon" type="image/svg+xml" href="/Flow-favicon.svg" />
     <link rel="apple-touch-icon" href="/Flow-apple-touch-icon.png" />
     <link rel="manifest" href="/Flow-site.webmanifest" />
-    <style>
-      :root {
-        color-scheme: dark;
-      }
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        background: #05050a;
-        color: #cfd2e0;
-        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
-        overflow: hidden;
-      }
-      #viz {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        display: block;
-      }
-      #status {
-        position: fixed;
-        left: 12px;
-        bottom: 10px;
-        font-size: 12px;
-        letter-spacing: 0.02em;
-        opacity: 0.55;
-        pointer-events: none;
-        max-width: calc(100vw - 24px);
-        z-index: 5;
-      }
-      #controls {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 14px;
-        align-items: center;
-        padding: 8px 12px;
-        font-size: 13px;
-        background: linear-gradient(#05050acc, #05050a00);
-        backdrop-filter: blur(2px);
-        z-index: 4;
-      }
-      #controls .brand {
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        color: #54f0c8;
-      }
-      button,
-      select,
-      input[type='range'] {
-        font: inherit;
-      }
-      #controls button {
-        background: #14142a;
-        color: #cfd2e0;
-        border: 1px solid #2a2a44;
-        border-radius: 6px;
-        padding: 4px 10px;
-        cursor: pointer;
-      }
-      #controls button:hover {
-        border-color: #54f0c8;
-      }
-      input[type='range'] {
-        accent-color: #54f0c8;
-      }
-      #transport {
-        position: fixed;
-        left: 50%;
-        bottom: 34px;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        padding: 6px 12px;
-        background: #0c0c18cc;
-        border: 1px solid #2a2a44;
-        border-radius: 999px;
-        font-size: 12px;
-        z-index: 5;
-      }
-      #transport[hidden] {
-        display: none;
-      }
-      #transport button {
-        background: #14142a;
-        color: #cfd2e0;
-        border: 1px solid #2a2a44;
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        cursor: pointer;
-      }
-      #transport #seek {
-        width: 220px;
-      }
-      #transport #time {
-        opacity: 0.7;
-        font-variant-numeric: tabular-nums;
-      }
-      #panel {
-        position: fixed;
-        top: 48px;
-        right: 12px;
-        width: 260px;
-        padding: 12px 14px;
-        background: #0c0c18ee;
-        border: 1px solid #2a2a44;
-        border-radius: 10px;
-        display: grid;
-        gap: 10px;
-        font-size: 13px;
-        box-shadow: 0 8px 30px #000a;
-        z-index: 6;
-      }
-      #panel[hidden] {
-        display: none;
-      }
-      #panel .row {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        align-items: center;
-        gap: 8px;
-      }
-      #panel .row.full {
-        grid-template-columns: 1fr;
-      }
-      #panel label {
-        opacity: 0.85;
-      }
-      #panel select,
-      #panel input[type='range'] {
-        width: 130px;
-      }
-      #panel select {
-        background: #14142a;
-        color: #cfd2e0;
-        border: 1px solid #2a2a44;
-        border-radius: 6px;
-        padding: 3px 6px;
-      }
-      #panel .reset {
-        background: #1a1430;
-        color: #cfd2e0;
-        border: 1px solid #2a2a44;
-        border-radius: 6px;
-        padding: 5px;
-        cursor: pointer;
-      }
-      #panel h3 {
-        margin: 0;
-        font-size: 12px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        opacity: 0.6;
-      }
-      @media (max-width: 720px) {
-        #controls {
-          gap: 8px;
-          padding: max(8px, env(safe-area-inset-top)) 10px 12px;
-          font-size: 14px;
-        }
-        #controls button {
-          min-height: 40px;
-          padding: 7px 11px;
-        }
-        #controls label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          min-height: 40px;
-        }
-        #status {
-          left: 8px;
-          bottom: max(8px, env(safe-area-inset-bottom));
-          max-width: calc(100vw - 32px);
-          padding: 6px 8px;
-          background: #05050acc;
-          border-radius: 6px;
-          opacity: 0.82;
-        }
-        #transport {
-          bottom: calc(48px + env(safe-area-inset-bottom));
-          max-width: calc(100vw - 32px);
-        }
-        #transport #seek {
-          width: min(42vw, 220px);
-        }
-        #panel {
-          top: 112px;
-          right: 8px;
-          width: min(260px, calc(100vw - 44px));
-          max-height: calc(100vh - 150px);
-          overflow-y: auto;
-        }
-      }
-    </style>
   </head>
   <body>
-    <canvas id="viz"></canvas>
-    <div id="controls">
-      <span class="brand">VibratoFlow</span>
-      <button id="demo" type="button">Demo signal</button>
-      <button id="mic" type="button">Microphone</button>
-      <button id="system" type="button">System audio</button>
-      <button id="stop" type="button" title="Stop listening">■ Stop</button>
-      <label
-        ><span style="opacity: 0.7">File</span>
-        <input id="file" type="file" accept="audio/*" /></label
-      >
-      <button id="export" type="button" style="margin-left: auto">⤓ PNG</button>
-      <button id="settings-btn" type="button">⚙ Settings</button>
+    <div id="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="VibratoFlow home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>
+            <strong>VibratoFlow</strong>
+            <small>Music, drawn live</small>
+          </span>
+        </a>
+        <div class="utility-actions" aria-label="Visual actions">
+          <button id="export" class="quiet-button" type="button">Save frame</button>
+          <button
+            id="settings-btn"
+            class="quiet-button"
+            type="button"
+            aria-controls="panel"
+            aria-expanded="false"
+          >
+            Adjust
+          </button>
+        </div>
+      </header>
+
+      <main id="stage" class="stage" aria-label="Live music visualization">
+        <canvas id="viz">Your browser does not support the visualization canvas.</canvas>
+        <div class="stage-label" aria-hidden="true">
+          <span id="source-kicker">Demo</span>
+          <strong id="source-title">Generated signal</strong>
+        </div>
+      </main>
+
+      <section id="control-deck" class="control-deck" aria-label="Audio source controls">
+        <div class="source-controls" role="group" aria-label="Choose what VibratoFlow listens to">
+          <button id="demo" class="source-button" type="button" aria-pressed="true">
+            <span>Demo</span>
+            <small>Try it now</small>
+          </button>
+          <button id="mic" class="source-button" type="button" aria-pressed="false">
+            <span>Microphone</span>
+            <small>Room or speaker</small>
+          </button>
+          <button id="system" class="source-button" type="button" aria-pressed="false">
+            <span>Other app</span>
+            <small>When supported</small>
+          </button>
+          <button id="file-trigger" class="source-button" type="button" aria-pressed="false">
+            <span>Audio file</span>
+            <small id="file-label">Choose from device</small>
+          </button>
+          <label class="visually-hidden" for="file">Choose audio file</label>
+          <input id="file" name="audio-file" class="visually-hidden" type="file" accept="audio/*" />
+        </div>
+
+        <div class="session-row">
+          <div class="session-copy">
+            <p id="status" role="status" aria-live="polite">Loading VibratoFlow…</p>
+            <p id="capability-note">
+              Audio stays on this device. Listening to another app depends on browser, operating system, and the source app.
+            </p>
+          </div>
+          <button id="stop" class="stop-button" type="button">Stop listening</button>
+        </div>
+
+        <div id="transport" class="transport" hidden>
+          <button id="playpause" class="transport-button" type="button" aria-label="Play">Play</button>
+          <label class="seek-control" for="seek">
+            <span class="visually-hidden">Playback position</span>
+            <input id="seek" name="playback-position" type="range" min="0" max="1" step="0.001" value="0" />
+          </label>
+          <span id="time">0:00 / 0:00</span>
+        </div>
+      </section>
     </div>
-    <div id="transport" hidden>
-      <button id="playpause" type="button">▶</button>
-      <input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek" />
-      <span id="time">0:00 / 0:00</span>
-    </div>
-    <div id="panel" hidden></div>
-    <div id="status" role="status" aria-live="polite">Loading VibratoFlow…</div>
+
+    <aside id="panel" role="dialog" aria-labelledby="settings-title" hidden></aside>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

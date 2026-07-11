@@ -1,66 +1,117 @@
-# VibratoFlow — Architecture
+# VibratoFlow — architecture
 
-Local-first, real-time music-interpretation oscilloscope visualizer (web MVP).
-Finalized name **VibratoFlow** (PRD working title was "OscilloFlow").
+VibratoFlow is a framework-free, local-first, real-time music visualizer. The 2026-07-11 design pass changes the product shell, settings boundary, and source-state presentation without replacing the DSP or rendering pipeline.
 
-## Pipeline (PRD §15.1)
+## Runtime pipeline
 
+```text
+Input adapter
+  demo / microphone / decoded file / media-element file fallback / shared display audio
+  → AudioGraph
+  → AudioWorklet: preprocessor.worklet.ts
+      DC removal · AGC · soft limiter · clip state · fast features
+  → SharedArrayBuffer RingBuffer
+  → features.worker.ts
+      FFT · bands · centroid · flux · onset · stereo width
+      broad timbre and vocal-presence classification
+  → FeatureFrame
+  → visual grammar: mappings.ts
+  → WebGL2 renderer
+      TracePass → PersistencePass → BloomPass → Composite
+  → optional PNG still export
 ```
-Input adapter (mic / decoded file / browser-media file fallback / system / oscillator-test)
-  → AudioWorklet  preprocessor.worklet.ts   [audio thread, no allocation]
-      DC removal · AGC + soft limiter · clip flag · fast features (RMS/peak/ZCR/env)
-  → RingBuffer (SharedArrayBuffer, lock-free SPSC; ch: L, R, mono)
-  → features.worker.ts                      [worker thread]
-      Hann → FFT → band energies · centroid · flux · onset · stereo width  (~90 Hz)
-      HeuristicClassifier (broad timbre + vocal presence, throttled ~300 ms, EMA + hysteresis)
-  → FeatureFrame (assembled on main thread from FeatureBus / SpectralBus / ClassBus SABs)
-  → VisualGrammar  grammar/mappings.ts      [pure, deterministic, classifier-optional]
-  → Renderer (WebGL2): TracePass → PersistencePass (ping-pong) → BloomPass → Composite/tone-map
-  → StillExport (PNG readback, session-preserving)
+
+## UI and state composition
+
+```text
+index.html
+  semantic product shell and fixed control targets
+  → src/app/ui/app.css
+      responsive layout, visual language, focus/touch states
+  → src/main.ts
+      composition root and source-session orchestration
+      → SettingsStore
+          versioned/sanitized local preferences
+      → SettingsPanel
+          generated labelled controls
+      → capture adapters / transport / renderer / diagnostics
 ```
 
-## Invariants
+`src/main.ts` remains intentionally large for this release candidate. The next defensible extraction is a source-session coordinator, but only after browser and device acceptance establishes the required behavior. A broad component/framework migration is not justified.
 
-- **The renderer never depends on the classifier or worker** — raw features always suffice; the
-  classifier only emits structured, smoothed signals (PRD §15.5, §22).
-- **No allocation in the audio callback**; the worklet does fixed-size math + ring writes (§14.1).
-- **Analysis runs iff a graph-backed source is active and the tab is visible** — the worker is
-  paused on Stop / demo / hidden tab, and re-initialized (fresh adaptive-normalizer state) on
-  every source start (§14.6, §15.4).
-- **Local-first**: zero production dependencies; no network egress at runtime (§14.4).
+## Settings boundary
 
-## Deployment requirement — cross-origin isolation
+`SettingsStore` persists visual preferences and `preferredSource` to `localStorage` under `vibratoflow.settings.v2`.
 
-The real-time pipeline uses `SharedArrayBuffer`, which browsers only enable when the page is
-cross-origin isolated. **The host must send:**
+The store:
 
-```
+- migrates valid v1 settings;
+- rejects malformed structures;
+- clamps numeric values to supported bounds;
+- validates custom hex colour and source enum values;
+- preserves preferred source when visual defaults are restored;
+- does not persist active media handles, file objects, browser permissions, PCM, or transcript data.
+
+Preferred source is not active source. Microphone, shared display audio, and local files require a new user gesture after reload.
+
+## Source lifecycle
+
+One active presentation source exists at a time:
+
+- Demo uses `SyntheticSource` and no audio graph.
+- Microphone and shared audio produce a `MediaStream` connected to `AudioGraph`.
+- Decoded files use `FilePlayer`.
+- Browser-media fallback uses `MediaFilePlayer` and a local blob URL.
+- Stop selects an explicit silence source and pauses analysis.
+
+Capture tracks are observed for external termination. The current code does not yet serialize overlapping asynchronous source starts. Add a session token or cancellation coordinator only if E2E/manual testing reproduces a race.
+
+## Rendering invariants
+
+- The audio callback performs fixed-size work and avoids allocation.
+- Rendering does not depend on classifier availability.
+- The classifier supplies optional structured influence, not the primary visual signal.
+- Demo mode can run when real-time SharedArrayBuffer capability is unavailable.
+- The dark canvas is an instrument surface; the surrounding UI is deliberately neutral.
+- Custom colour enters through visual grammar rather than creating a second rendering path.
+
+## Deployment requirement
+
+The real-time pipeline uses `SharedArrayBuffer`, which requires cross-origin isolation. The host must send:
+
+```text
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-The dev/preview servers set these (see `crossOriginIsolation()` in `vite.config.ts`) and Vercel
-uses `vercel.json`. The AudioWorklet is emitted through Vite `?worker&url` as a separate
-executable JavaScript chunk and checked by `scripts/verify-dist.mjs`. Without them the app
-degrades honestly to demo-only with an explanatory status (`realtimeSupported()` in
-`src/core/capture/Capabilities.ts`). A postMessage fallback pipeline is deliberately deferred —
-see "Accepted trade-offs".
+The development server is fixed to port 5174 with `strictPort: true`. Preview uses 4173. The AudioWorklet is emitted through Vite’s worker URL path and verified after every production build.
 
-## Accepted trade-offs
+Without COOP/COEP, capability handling disables live sources and exposes demo-only status rather than attempting a degraded real-time transport.
 
-- `BandXY` / `HybridGrammar` use module-scope scratch buffers: allocation-free by design; safe
-  because exactly one render loop runs per page. Not re-entrant — do not call from workers.
-- The demo signal bypasses the analysis graph and fakes gentle features (`applyDemoFrame`).
-- `main.ts` is a large single composition root. A structural refactor is backlog: it is
-  fully behind the gate tests and pre-1.0 churn risk outweighs value.
-- SAB fallback (postMessage transport) deferred until a target host cannot set COOP/COEP.
-- File import uses decoded-buffer playback first and a same-origin blob/media-element fallback
-  when the browser rejects the file in `decodeAudioData()`.
+## Other-app capture boundary
 
-## Module map
+The web adapter uses display/tab/window capture with optional audio. It is not a universal system-audio mixer and cannot promise access to any named third-party app. A native Android AudioPlaybackCapture adapter would be a separate platform layer and must preserve the same local sample/feature contract.
 
-`src/core/` is DOM-free and portable (Rust/C++ port seam): `capture/` (adapters + capabilities),
-`preprocess/` (worklet + AGC), `pipeline/` (ring, buses, AudioGraph, FilePlayer), `features/`
-(FFT, spectral, FeatureFrame, worker), `classify/` (heuristic classifier, vocal presence),
-`grammar/` (mappings, presets, palettes), `render/` (passes + modes), `export/`, `diagnostics/`.
-`src/app/` holds UI: settings store/panel, debug overlay, honest copy strings.
+## Transcription seam — not implemented
+
+A future local transcription subsystem must remain separate from the fast spectral worker:
+
+```text
+post-AGC mono audio
+  → bounded 16 kHz queue
+  → transcription worker/runtime
+  → typed partial/final transcript bus
+  → optional one/three-line presenter
+```
+
+No ASR model, transcript persistence, or lyrics UI is included in this release candidate. See `FEATURE-VIABILITY-2026-07-11.md`.
+
+## Accepted trade-offs and residual risks
+
+- No postMessage fallback for browsers without SharedArrayBuffer.
+- No service worker; local processing does not guarantee offline startup.
+- No source-start cancellation token yet.
+- No dedicated AudioWorklet crash health channel.
+- No focus trap inside the settings sheet, although open/close/focus restoration is implemented.
+- Development dependency audit findings require an isolated breaking toolchain upgrade; production dependency audit is clean.
+- Automated browser and exact-device acceptance remain release gates.
