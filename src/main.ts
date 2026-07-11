@@ -64,6 +64,7 @@ function main(): void {
   const store = new SettingsStore();
   const perf = new PerfMonitor();
   const overlay = new DebugOverlay();
+  const canUseRealtime = realtimeSupported();
 
   // A source that reports no audio: the trace decays to black (stopped state).
   const SILENCE: AudioFrameSource = { sampleRate: 48000, channels: 2, read: () => false };
@@ -208,7 +209,7 @@ function main(): void {
 
   // The real-time pipeline needs cross-origin isolation (SAB). On hosts without
   // COOP/COEP headers, degrade honestly: demo only, with an explanation (§14.3).
-  if (!realtimeSupported()) {
+  if (!canUseRealtime) {
     for (const id of ['mic', 'system', 'file']) {
       const el = document.getElementById(id);
       if (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) {
@@ -442,7 +443,9 @@ function main(): void {
     }) as never,
   };
 
-  setStatus(`${APP_NAME} — demo signal · WebGL2${renderer.hdr ? ' · HDR' : ''}`);
+  if (canUseRealtime) {
+    setStatus(`${APP_NAME} — demo signal · WebGL2${renderer.hdr ? ' · HDR' : ''}`);
+  }
 }
 
 main();
