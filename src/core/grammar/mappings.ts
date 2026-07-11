@@ -31,7 +31,7 @@ function dominantCategory(classes: Record<Category, number>): { name: Category; 
  * classifier (graceful fallback). Reduced-motion suppresses transient
  * bursts/bloom pumping so the output never strobes (PRD §14.5).
  */
-export function toRenderParams(frame: FeatureFrame, s: Settings): RenderParams {
+export function toRenderParams(frame: FeatureFrame, s: Settings, timeSec = 0): RenderParams {
   const reduced = s.reducedMotion;
   const rms = clamp(frame.rms * s.sensitivity, 0, 1);
   const bass = clamp((frame.bands[BASS] + frame.bands[LOW_MID]) * 0.5, 0, 1);
@@ -67,8 +67,28 @@ export function toRenderParams(frame: FeatureFrame, s: Settings): RenderParams {
   }
 
   const color = paletteColor(s.palette, frame.centroid, intensity);
+  const colorMode =
+    s.palette === 'norwegian-flow'
+      ? 'norwegian-flow'
+      : s.palette === 'norwegian-flag'
+        ? 'norwegian-flag'
+        : 'solid';
+  // Reduced-motion freezes only the palette animation. Geometry and all other
+  // palette behavior keep following their existing paths.
+  const colorFlowTime = colorMode !== 'solid' && !reduced ? timeSec : 0;
   const spread = 0.5 + 0.5 * frame.stereoWidth;
   const resolutionScale = s.lowPower ? 0.6 : 1;
 
-  return { scale, intensity, decay, bloom, color, burst, spread, resolutionScale };
+  return {
+    scale,
+    intensity,
+    decay,
+    bloom,
+    color,
+    colorMode,
+    colorFlowTime,
+    burst,
+    spread,
+    resolutionScale,
+  };
 }

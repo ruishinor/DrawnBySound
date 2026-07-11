@@ -304,7 +304,7 @@ function main(): void {
     if (liveBus && graph) graph.readFeatures(featureFrame);
     else applyDemoFrame(t);
 
-    const params = toRenderParams(featureFrame, s);
+    const params = toRenderParams(featureFrame, s, t);
     const mode = MODE_BY_ID.get(s.mode) ?? StereoXY;
 
     const hasData = source.read(left, right, WINDOW);

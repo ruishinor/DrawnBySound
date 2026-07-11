@@ -9,21 +9,36 @@ import { test, expect, type Page } from '@playwright/test';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const hooks = (page: Page) => page.waitForFunction(() => !!(window as any).__vibrato);
 
-test('boots cross-origin isolated with a live demo visual', async ({ page }) => {
+test('boots cross-origin isolated with a live demo source', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
 
   await expect(page.locator('#status')).toContainText('VibratoFlow — demo signal');
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 
+  const probe = await page.evaluate(() => (window as any).__vibrato.probe());
+  expect(probe.ok).toBe(true);
+  expect(probe.max).toBeGreaterThan(0.5);
+});
+
+test('Norwegian palettes are selectable without changing the selected rendering mode', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+
+  const mode = page.getByLabel('Mode');
+  const palette = page.getByLabel('Palette');
+  const initialMode = await mode.inputValue();
+
+  await palette.selectOption('norwegian-flow');
+  await expect(palette.locator('option:checked')).toHaveText('NorwegianFlow');
+  await expect(mode).toHaveValue(initialMode);
+
+  await palette.selectOption('norwegian-flag');
+  await expect(palette.locator('option:checked')).toHaveText('NorwegianFlag');
+  await expect(mode).toHaveValue(initialMode);
   await expect
-    .poll(
-      () =>
-        page.evaluate(() =>
-          (window as any).__vibrato.averageLuminance(),
-        ),
-      { timeout: 10_000 },
-    )
+    .poll(() => page.evaluate(() => (window as any).__vibrato.averageLuminance()))
     .toBeGreaterThan(0);
 });
 

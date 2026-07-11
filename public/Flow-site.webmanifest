@@ -1,0 +1,31 @@
+{
+  "name": "VibratoFlow",
+  "short_name": "VibratoFlow",
+  "description": "Local-first, real-time music-interpretation oscilloscope visualizer.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#05050a",
+  "theme_color": "#07051a",
+  "icons": [
+    {
+      "src": "/Flow-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Flow-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Flow-apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

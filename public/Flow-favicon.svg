@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Flow icon">
+  <defs>
+    <radialGradient id="bgGlow" cx="58%" cy="43%" r="72%">
+      <stop offset="0%" stop-color="#1a0030"/>
+      <stop offset="60%" stop-color="#0b0223"/>
+      <stop offset="100%" stop-color="#040414"/>
+    </radialGradient>
+    <linearGradient id="trailPink" x1="130" y1="380" x2="408" y2="138" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff3a4e"/>
+      <stop offset="55%" stop-color="#ff3c72"/>
+      <stop offset="100%" stop-color="#ff7840"/>
+    </linearGradient>
+    <linearGradient id="trailCore" x1="176" y1="354" x2="372" y2="152" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff5c2e"/>
+      <stop offset="35%" stop-color="#ff7d1c"/>
+      <stop offset="70%" stop-color="#ffb22c"/>
+      <stop offset="100%" stop-color="#ffe07a"/>
+    </linearGradient>
+    <filter id="glowSoft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="c"/>
+      <feMerge>
+        <feMergeNode in="c"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowBig" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="20" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.8 0"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="86" fill="url(#bgGlow)"/>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M128 382C96 328 118 247 192 196C274 140 377 163 411 227C435 272 412 338 347 382C276 430 165 430 128 382Z" stroke="#ff185f" stroke-width="13" opacity="0.24" filter="url(#glowBig)"/>
+    <path d="M141 388C109 334 130 258 198 209C274 155 370 174 401 233C424 276 403 333 343 373C278 417 177 420 141 388Z" stroke="#ff6d2f" stroke-width="11" opacity="0.18" filter="url(#glowBig)"/>
+  </g>
+
+  <g fill="none" stroke="url(#trailPink)" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowSoft)">
+    <path d="M123 377C94 328 116 254 188 204C268 149 373 169 409 228C436 272 412 345 345 389C271 438 159 429 123 377Z" stroke-width="5" opacity="0.95"/>
+    <path d="M137 386C108 340 128 272 196 224C271 171 366 187 395 239C416 277 395 334 339 371C277 412 175 415 137 386Z" stroke-width="4.8" opacity="0.93"/>
+    <path d="M153 393C126 350 144 286 204 241C271 194 355 205 381 251C401 284 383 331 332 365C278 401 190 410 153 393Z" stroke-width="4.5" opacity="0.9"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowSoft)">
+    <path d="M172 357C150 321 164 279 211 239C266 191 326 198 354 232C381 265 369 311 328 350C285 389 211 391 172 357Z" stroke="#ff2f63" stroke-width="26" opacity="0.7"/>
+    <path d="M181 350C161 318 174 282 218 247C272 202 330 209 355 241C379 271 368 313 330 347C288 384 216 387 181 350Z" stroke="url(#trailCore)" stroke-width="23" opacity="0.98"/>
+    <path d="M189 343C171 315 184 285 224 255C275 217 328 223 350 251C370 276 360 311 327 340C291 373 221 378 189 343Z" stroke="#ffed8f" stroke-width="4.8" opacity="0.92"/>
+    <path d="M168 359C190 328 225 292 262 260C309 219 351 179 369 155C381 139 396 131 411 137C426 143 432 158 430 179C426 215 406 251 379 285C352 320 317 358 283 387" stroke="url(#trailCore)" stroke-width="22" opacity="0.98"/>
+    <path d="M178 356C198 326 231 292 267 260C311 221 352 183 368 161C380 146 392 142 401 146C412 151 416 163 414 180C411 212 394 247 368 281C342 316 309 351 278 379" stroke="#ffef9d" stroke-width="4.6" opacity="0.92"/>
+  </g>
+</svg>

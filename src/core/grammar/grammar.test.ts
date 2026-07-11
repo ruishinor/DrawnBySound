@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toRenderParams } from './mappings';
 import { PRESETS } from './presets';
+import { PALETTE_IDS, paletteLabel } from './palettes';
 import { DEFAULT_SETTINGS, type Settings } from '../../app/SettingsStore';
 import { createFeatureFrame, type FeatureFrame } from '../features/FeatureFrame';
 
@@ -52,6 +53,42 @@ describe('toRenderParams (deterministic grammar)', () => {
     const p = toRenderParams(frameWith({ rms: 0.5 }), { ...DEFAULT_SETTINGS, lowPower: true });
     expect(p.bloom).toBe(0);
     expect(p.resolutionScale).toBeLessThan(1);
+  });
+
+  it('isolates NorwegianFlow animation from all existing palettes', () => {
+    const f = frameWith({ rms: 0.5, centroid: 0.5 });
+    const normal = toRenderParams(f, DEFAULT_SETTINGS, 12.5);
+    const norwegian = toRenderParams(
+      f,
+      { ...DEFAULT_SETTINGS, palette: 'norwegian-flow' },
+      12.5,
+    );
+    const flag = toRenderParams(
+      f,
+      { ...DEFAULT_SETTINGS, palette: 'norwegian-flag' },
+      12.5,
+    );
+    const reduced = toRenderParams(
+      f,
+      { ...DEFAULT_SETTINGS, palette: 'norwegian-flow', reducedMotion: true },
+      12.5,
+    );
+
+    expect(normal.colorMode).toBe('solid');
+    expect(normal.colorFlowTime).toBe(0);
+    expect(norwegian.colorMode).toBe('norwegian-flow');
+    expect(norwegian.colorFlowTime).toBe(12.5);
+    expect(flag.colorMode).toBe('norwegian-flag');
+    expect(flag.colorFlowTime).toBe(12.5);
+    expect(reduced.colorMode).toBe('norwegian-flow');
+    expect(reduced.colorFlowTime).toBe(0);
+  });
+
+  it('exposes separate NorwegianFlow and NorwegianFlag labels', () => {
+    expect(PALETTE_IDS).toContain('norwegian-flow');
+    expect(PALETTE_IDS).toContain('norwegian-flag');
+    expect(paletteLabel('norwegian-flow')).toBe('NorwegianFlow');
+    expect(paletteLabel('norwegian-flag')).toBe('NorwegianFlag');
   });
 });
 

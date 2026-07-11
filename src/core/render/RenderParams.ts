@@ -10,6 +10,10 @@ export interface RenderParams {
   bloom: number;
   /** Base trace color from palette × brightness. */
   color: [number, number, number];
+  /** Trace color behavior. Existing palettes remain uniform/solid. */
+  colorMode: 'solid' | 'norwegian-flow' | 'norwegian-flag';
+  /** Seconds driving only animated Norwegian color fields; 0 freezes them. */
+  colorFlowTime: number;
   /** Transient burst amount in [0,1] (onset-driven). */
   burst: number;
   /** Horizontal/vertical spread from stereo width. */

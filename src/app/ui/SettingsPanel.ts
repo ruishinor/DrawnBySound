@@ -1,6 +1,6 @@
 import type { SettingsStore, Settings } from '../SettingsStore';
 import { PRESETS } from '../../core/grammar/presets';
-import { PALETTE_IDS } from '../../core/grammar/palettes';
+import { PALETTE_IDS, paletteLabel } from '../../core/grammar/palettes';
 import { MODES } from '../../core/render/modes';
 
 /**
@@ -127,7 +127,7 @@ export class SettingsPanel {
     this.el.appendChild(
       this.select(
         'Palette',
-        PALETTE_IDS.map((p) => ({ value: p, label: p })),
+        PALETTE_IDS.map((p) => ({ value: p, label: paletteLabel(p) })),
         s.palette,
         (v) => this.set('palette', v),
       ),
