@@ -17,8 +17,14 @@ function controlId(label: string): string {
 const CUSTOM_PRESET_DESCRIPTION =
   'Current controls do not exactly match a preset. Save them as a named preset or choose an existing preset.';
 const SAVED_PRESET_DESCRIPTION =
-  'Saved on this device. Editing a visual control creates unsaved Custom settings without changing the saved preset.';
+  'Saved for this site address on this device. Editing a visual control creates unsaved Custom settings without changing the saved preset.';
 const CUSTOM_PRESET_PREFIX = 'custom:';
+const LAST_SELECTED_PRESET_STORAGE_KEY = 'vibratoflow.lastSelectedPreset.v1';
+
+interface LastSelectedPreset {
+  value: string;
+  label: string;
+}
 
 interface SelectOption {
   value: string;
@@ -42,6 +48,7 @@ function modeDescription(id: string): string {
 export class SettingsPanel {
   private readonly el: HTMLElement;
   private readonly customPresets = new CustomPresetStore();
+  private lastSelectedPreset = this.loadLastSelectedPreset();
   private lastFocus: HTMLElement | null = null;
 
   constructor(
@@ -131,6 +138,132 @@ export class SettingsPanel {
     return PRESETS.find((preset) => preset.id === value)?.description ?? CUSTOM_PRESET_DESCRIPTION;
   }
 
+  private presetLabel(value: string): string | null {
+    if (value.startsWith(CUSTOM_PRESET_PREFIX)) {
+      return this.customPresets.findById(value.slice(CUSTOM_PRESET_PREFIX.length))?.name ?? null;
+    }
+    return PRESETS.find((preset) => preset.id === value)?.label ?? null;
+  }
+
+  private loadLastSelectedPreset(): LastSelectedPreset | null {
+    try {
+      const stored = globalThis.localStorage?.getItem(LAST_SELECTED_PRESET_STORAGE_KEY);
+      if (!stored) return null;
+      const parsed = JSON.parse(stored) as unknown;
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+      const record = parsed as Record<string, unknown>;
+      if (typeof record.value !== 'string' || record.value.length > 140) return null;
+      if (typeof record.label !== 'string') return null;
+      const label = record.label.trim();
+      if (!label || label.length > 80) return null;
+      return { value: record.value, label };
+    } catch {
+      return null;
+    }
+  }
+
+  private rememberLastSelectedPreset(value: string, label = this.presetLabel(value)): void {
+    if (!label) return;
+    this.lastSelectedPreset = { value, label };
+    try {
+      globalThis.localStorage?.setItem(
+        LAST_SELECTED_PRESET_STORAGE_KEY,
+        JSON.stringify(this.lastSelectedPreset),
+      );
+    } catch {
+      /* Keep the session value when local storage is unavailable. */
+    }
+  }
+
+  private rememberCurrentPreset(): void {
+    const current = this.presetValue();
+    if (current) this.rememberLastSelectedPreset(current);
+  }
+
+  private clearLastSelectedPreset(value?: string): void {
+    if (value && this.lastSelectedPreset?.value !== value) return;
+    this.lastSelectedPreset = null;
+    try {
+      globalThis.localStorage?.removeItem(LAST_SELECTED_PRESET_STORAGE_KEY);
+    } catch {
+      /* The in-memory value is already cleared. */
+    }
+  }
+
+  private applyPreset(value: string): void {
+    const custom = value.startsWith(CUSTOM_PRESET_PREFIX)
+      ? this.customPresets.findById(value.slice(CUSTOM_PRESET_PREFIX.length))
+      : null;
+    const settingsPatch = custom?.settings ?? PRESETS.find((candidate) => candidate.id === value)?.settings;
+    if (!settingsPatch) return;
+
+    this.rememberLastSelectedPreset(value, custom?.name);
+    const scrollTop = this.el.scrollTop;
+    this.store.update(settingsPatch);
+    this.onChange();
+    this.render();
+    this.el.scrollTop = scrollTop;
+    requestAnimationFrame(() => {
+      this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
+    });
+  }
+
+  private presetSupport(value: string): HTMLElement {
+    const support = document.createElement('div');
+    support.className = 'preset-support';
+
+    if (value === '' && this.lastSelectedPreset) {
+      const lastSelected = document.createElement('p');
+      lastSelected.id = 'vf-last-selected-preset';
+      lastSelected.className = 'preset-last-selected';
+      lastSelected.append('Last selected preset: ');
+      const name = document.createElement('strong');
+      name.textContent = this.lastSelectedPreset.label;
+      lastSelected.appendChild(name);
+      support.appendChild(lastSelected);
+    }
+
+    const saved = this.customPresets.getAll();
+    const savedArea = document.createElement('div');
+    savedArea.id = 'vf-saved-presets';
+    savedArea.className = 'saved-presets';
+
+    const header = document.createElement('div');
+    header.className = 'saved-presets-header';
+    const heading = document.createElement('strong');
+    heading.textContent = 'Saved presets';
+    const scope = document.createElement('span');
+    scope.textContent = 'This site address only';
+    header.append(heading, scope);
+    savedArea.appendChild(header);
+
+    if (saved.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'saved-presets-empty';
+      empty.textContent = 'None saved here yet. Localhost, previews, and production keep separate lists.';
+      savedArea.appendChild(empty);
+    } else {
+      const list = document.createElement('div');
+      list.className = 'saved-preset-list';
+      for (const preset of saved) {
+        const presetValue = `${CUSTOM_PRESET_PREFIX}${preset.id}`;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'saved-preset-button';
+        button.textContent = preset.name;
+        button.setAttribute('aria-label', `Load saved preset ${preset.name}`);
+        button.setAttribute('aria-pressed', String(value === presetValue));
+        if (value === presetValue) button.classList.add('is-active');
+        button.addEventListener('click', () => this.applyPreset(presetValue));
+        list.appendChild(button);
+      }
+      savedArea.appendChild(list);
+    }
+
+    support.appendChild(savedArea);
+    return support;
+  }
+
   private syncPresetActions(value: string): void {
     const save = this.el.querySelector<HTMLButtonElement>('#vf-save-current-preset');
     const remove = this.el.querySelector<HTMLButtonElement>('#vf-delete-saved-preset');
@@ -152,6 +285,8 @@ export class SettingsPanel {
     const description = descriptionId ? this.el.querySelector<HTMLElement>(`#${descriptionId}`) : null;
     if (description) description.textContent = this.presetDescription(value);
     this.syncPresetActions(value);
+    const support = this.el.querySelector<HTMLElement>('.preset-support');
+    if (support) support.replaceWith(this.presetSupport(value));
   }
 
   private presetActions(): HTMLElement {
@@ -170,7 +305,8 @@ export class SettingsPanel {
       const name = globalThis.prompt('Name this preset (1–40 characters):');
       if (name === null) return;
       try {
-        this.customPresets.save(name, this.store.get());
+        const preset = this.customPresets.save(name, this.store.get());
+        this.rememberLastSelectedPreset(`${CUSTOM_PRESET_PREFIX}${preset.id}`, preset.name);
         const scrollTop = this.el.scrollTop;
         this.render();
         this.el.scrollTop = scrollTop;
@@ -196,6 +332,7 @@ export class SettingsPanel {
       if (!globalThis.confirm(`Delete the saved preset “${preset.name}”?`)) return;
       try {
         this.customPresets.delete(preset.id);
+        this.clearLastSelectedPreset(value);
         const scrollTop = this.el.scrollTop;
         this.render();
         this.el.scrollTop = scrollTop;
@@ -217,6 +354,7 @@ export class SettingsPanel {
     value: string,
     onSet: (value: string) => void,
     description?: string | ((value: string) => string),
+    afterControl?: HTMLElement,
   ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'setting-row';
@@ -251,7 +389,14 @@ export class SettingsPanel {
       if (copy.description) copy.description.textContent = resolveDescription(select.value) ?? '';
       onSet(select.value);
     });
-    row.append(copy.wrapper, select);
+    if (afterControl) {
+      const stack = document.createElement('div');
+      stack.className = 'select-stack';
+      stack.append(select, afterControl);
+      row.append(copy.wrapper, stack);
+    } else {
+      row.append(copy.wrapper, select);
+    }
     return row;
   }
 
@@ -465,22 +610,9 @@ export class SettingsPanel {
           })),
         ],
         this.presetValue(settings),
-        (value) => {
-          const custom = value.startsWith(CUSTOM_PRESET_PREFIX)
-            ? this.customPresets.findById(value.slice(CUSTOM_PRESET_PREFIX.length))
-            : null;
-          const settingsPatch = custom?.settings ?? PRESETS.find((candidate) => candidate.id === value)?.settings;
-          if (!settingsPatch) return;
-          const scrollTop = this.el.scrollTop;
-          this.store.update(settingsPatch);
-          this.onChange();
-          this.render();
-          this.el.scrollTop = scrollTop;
-          requestAnimationFrame(() => {
-            this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
-          });
-        },
+        (value) => this.applyPreset(value),
         (value) => this.presetDescription(value),
+        this.presetSupport(this.presetValue(settings)),
       ),
     );
     interfaceSection.appendChild(
@@ -489,6 +621,7 @@ export class SettingsPanel {
         PALETTE_IDS.map((palette) => ({ value: palette, label: paletteLabel(palette) })),
         settings.palette,
         (value) => {
+          this.rememberCurrentPreset();
           this.store.update({ palette: value, useCustomColor: false });
           const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
           if (toggle) toggle.checked = false;
@@ -504,6 +637,7 @@ export class SettingsPanel {
         MODES.map((mode) => ({ value: mode.id, label: mode.label })),
         settings.mode,
         (value) => {
+          this.rememberCurrentPreset();
           this.set('mode', value);
           this.syncPresetSelection();
         },
@@ -516,6 +650,7 @@ export class SettingsPanel {
         settings.customColor,
         settings.useCustomColor,
         (value) => {
+          this.rememberCurrentPreset();
           this.store.update({ customColor: value, useCustomColor: true });
           const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
           if (toggle) toggle.checked = true;
@@ -524,6 +659,7 @@ export class SettingsPanel {
         },
         'Use custom colour',
         (value) => {
+          this.rememberCurrentPreset();
           this.set('useCustomColor', value);
           this.syncPresetSelection();
         },
@@ -585,6 +721,7 @@ export class SettingsPanel {
         0.1,
         settings.sensitivity,
         (value) => {
+          this.rememberCurrentPreset();
           this.set('sensitivity', value);
           this.syncPresetSelection();
         },
@@ -610,6 +747,7 @@ export class SettingsPanel {
         0.01,
         settings.persistence,
         (value) => {
+          this.rememberCurrentPreset();
           this.set('persistence', value);
           this.syncPresetSelection();
         },
@@ -624,6 +762,7 @@ export class SettingsPanel {
         0.05,
         settings.bloom,
         (value) => {
+          this.rememberCurrentPreset();
           this.set('bloom', value);
           this.syncPresetSelection();
         },

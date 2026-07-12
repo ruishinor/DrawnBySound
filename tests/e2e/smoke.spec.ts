@@ -200,6 +200,7 @@ test('custom presets preserve the edited snapshot without mutating the saved def
   });
 
   await expect(preset.locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.locator('#vf-last-selected-preset')).toContainText('Deep Bass Field');
   await expect(page.getByLabel('Shape')).toHaveValue('stereo-xy');
   await expect(page.getByLabel('Colour set')).toHaveValue('ice');
   await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
@@ -209,11 +210,14 @@ test('custom presets preserve the edited snapshot without mutating the saved def
   await page.getByRole('button', { name: 'Save current preset' }).click();
   await expect(preset.locator('option:checked')).toHaveText('Night bass');
   await expect(page.locator('#vf-preset-description')).toContainText('without changing the saved preset');
+  await expect(page.locator('#vf-saved-presets')).toContainText('Night bass');
+  await expect(page.getByRole('button', { name: 'Load saved preset Night bass' })).toBeVisible();
 
   await page.reload();
   await hooks(page);
   await page.click('#settings-btn');
   await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Night bass');
+  await expect(page.getByRole('button', { name: 'Load saved preset Night bass' })).toBeVisible();
 
   await page.getByLabel('Trail length').evaluate((element) => {
     const input = element as HTMLInputElement;
@@ -221,11 +225,10 @@ test('custom presets preserve the edited snapshot without mutating the saved def
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.locator('#vf-last-selected-preset')).toContainText('Night bass');
   await expect(page.getByLabel('Soft glow')).toHaveValue('0.1');
 
-  const savedValue = await page.getByLabel('Preset').locator('option', { hasText: 'Night bass' }).getAttribute('value');
-  expect(savedValue).not.toBeNull();
-  await page.getByLabel('Preset').selectOption(savedValue!);
+  await page.getByRole('button', { name: 'Load saved preset Night bass' }).click();
   await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
   await expect(page.getByLabel('Soft glow')).toHaveValue('0.1');
 
