@@ -31,7 +31,7 @@ test('primary controls use the accepted labels and source order', async ({ page 
     'Microphone',
     'External app',
     'Audio file',
-    'Preview',
+    'Demo',
   ]);
 });
 
@@ -138,6 +138,47 @@ test('interface theme and curated accent persist across reloads', async ({ page 
   await page.getByLabel('Interface theme').selectOption('light');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#dfe1df');
+});
+
+test('settings explain controls and keep the active preset visible', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+
+  const preset = page.getByLabel('Preset');
+  await expect(preset.locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.locator('#vf-input-gain-description')).toContainText('Playback volume is unchanged');
+  await expect(page.locator('#vf-custom-colour-description')).toContainText('visual trace only');
+  await expect(page.locator('#vf-shape-description')).toContainText('left channel horizontally');
+  await expect(page.locator('#vf-use-less-power-description')).toContainText('lower resolution');
+  await expect(page.locator('#vf-reduce-motion-description')).toContainText('sudden bursts');
+  await expect(page.locator('#vf-show-diagnostics-description')).toContainText('frame rate');
+
+  await preset.focus();
+  await preset.press('ArrowDown');
+  await expect(preset).toHaveValue('warm-room');
+  await expect(preset).toBeFocused();
+  await preset.press('ArrowDown');
+  await expect(preset).toHaveValue('mineral-lines');
+  await expect(preset).toBeFocused();
+
+  await preset.selectOption('deep-bass-field');
+  await expect(page.getByLabel('Preset')).toHaveValue('deep-bass-field');
+  await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Deep Bass Field');
+  await expect(page.locator('#vf-preset-description')).toContainText('low frequencies');
+
+  await page.reload();
+  await hooks(page);
+  await page.click('#settings-btn');
+  await expect(page.getByLabel('Preset')).toHaveValue('deep-bass-field');
+
+  await page.getByLabel('Soft glow').evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = '0.1';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.getByLabel('Preset')).toHaveValue('');
+  await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
 });
 
 test('settings modal owns mobile scrolling and leaves no exposed top strip', async ({ page }) => {

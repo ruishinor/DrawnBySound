@@ -4,13 +4,32 @@ import type {
   Settings,
   SettingsStore,
 } from '../SettingsStore';
-import { PRESETS } from '../../core/grammar/presets';
+import { matchingPresetId, PRESETS } from '../../core/grammar/presets';
 import { PALETTE_IDS, paletteLabel } from '../../core/grammar/palettes';
 import { MODES } from '../../core/render/modes';
 
 function controlId(label: string): string {
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/(^-|-$)/gu, '');
   return `vf-${slug}`;
+}
+
+const CUSTOM_PRESET_DESCRIPTION =
+  'Current controls do not exactly match a preset. Choose one to apply a complete visual style.';
+
+const MODE_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  'stereo-xy': 'Maps the left channel horizontally and the right channel vertically. Stereo width and panning change the figure.',
+  'mono-phase-xy': 'Compares one mono signal with a short delay. Pitch and phase create loops and ribbons.',
+  'band-xy': 'Maps low and high frequency bands against each other. The balance across the spectrum drives the movement.',
+  'beat-lissajous': 'Uses beat timing to drive a rotating loop. Rhythmic material produces the clearest motion.',
+  'hybrid-grammar': 'Combines stereo, frequency, and transient features. More reactive and complex than the other shapes.',
+};
+
+function presetDescription(id: string): string {
+  return PRESETS.find((preset) => preset.id === id)?.description ?? CUSTOM_PRESET_DESCRIPTION;
+}
+
+function modeDescription(id: string): string {
+  return MODE_DESCRIPTIONS[id] ?? 'Changes how the incoming audio is translated into the visual shape.';
 }
 
 /** Accessible, dependency-free settings modal backed by the persistent store. */
@@ -73,21 +92,54 @@ export class SettingsPanel {
     return section;
   }
 
+  private settingCopy(
+    label: string,
+    id: string,
+    description?: string,
+  ): { wrapper: HTMLElement; description?: HTMLParagraphElement } {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'setting-copy';
+    const lab = document.createElement('label');
+    lab.htmlFor = id;
+    lab.textContent = label;
+    wrapper.appendChild(lab);
+    if (!description) return { wrapper };
+
+    const paragraph = document.createElement('p');
+    paragraph.className = 'setting-description';
+    paragraph.id = `${id}-description`;
+    paragraph.textContent = description;
+    wrapper.appendChild(paragraph);
+    return { wrapper, description: paragraph };
+  }
+
+  private syncPresetSelection(): void {
+    const select = this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`);
+    if (!select) return;
+    const id = matchingPresetId(this.store.get()) ?? '';
+    select.value = id;
+    const descriptionId = select.getAttribute('aria-describedby');
+    const description = descriptionId ? this.el.querySelector<HTMLElement>(`#${descriptionId}`) : null;
+    if (description) description.textContent = presetDescription(id);
+  }
+
   private select(
     label: string,
     options: { value: string; label: string }[],
     value: string,
     onSet: (value: string) => void,
+    description?: string | ((value: string) => string),
   ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'setting-row';
     const id = controlId(label);
-    const lab = document.createElement('label');
-    lab.htmlFor = id;
-    lab.textContent = label;
+    const resolveDescription = (next: string): string | undefined =>
+      typeof description === 'function' ? description(next) : description;
+    const copy = this.settingCopy(label, id, resolveDescription(value));
     const select = document.createElement('select');
     select.id = id;
     select.name = id;
+    if (copy.description) select.setAttribute('aria-describedby', copy.description.id);
     for (const option of options) {
       const element = document.createElement('option');
       element.value = option.value;
@@ -95,8 +147,11 @@ export class SettingsPanel {
       select.appendChild(element);
     }
     select.value = value;
-    select.addEventListener('change', () => onSet(select.value));
-    row.append(lab, select);
+    select.addEventListener('change', () => {
+      if (copy.description) copy.description.textContent = resolveDescription(select.value) ?? '';
+      onSet(select.value);
+    });
+    row.append(copy.wrapper, select);
     return row;
   }
 
@@ -107,14 +162,13 @@ export class SettingsPanel {
     step: number,
     value: number,
     onSet: (value: number) => void,
+    description?: string,
   ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'setting-row';
     const id = controlId(label);
     const outputId = `${id}-value`;
-    const lab = document.createElement('label');
-    lab.htmlFor = id;
-    lab.textContent = label;
+    const copy = this.settingCopy(label, id, description);
 
     const wrap = document.createElement('div');
     wrap.className = 'range-wrap';
@@ -126,7 +180,9 @@ export class SettingsPanel {
     input.max = String(max);
     input.step = String(step);
     input.value = String(value);
-    input.setAttribute('aria-describedby', outputId);
+    input.setAttribute('aria-describedby',
+      [outputId, copy.description?.id].filter(Boolean).join(' '),
+    );
     const output = document.createElement('output');
     output.id = outputId;
     output.setAttribute('for', id);
@@ -137,24 +193,28 @@ export class SettingsPanel {
       onSet(next);
     });
     wrap.append(input, output);
-    row.append(lab, wrap);
+    row.append(copy.wrapper, wrap);
     return row;
   }
 
-  private checkbox(label: string, value: boolean, onSet: (value: boolean) => void): HTMLElement {
+  private checkbox(
+    label: string,
+    value: boolean,
+    onSet: (value: boolean) => void,
+    description?: string,
+  ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'toggle-row';
     const id = controlId(label);
-    const lab = document.createElement('label');
-    lab.htmlFor = id;
-    lab.textContent = label;
+    const copy = this.settingCopy(label, id, description);
     const input = document.createElement('input');
     input.id = id;
     input.name = id;
     input.type = 'checkbox';
     input.checked = value;
+    if (copy.description) input.setAttribute('aria-describedby', copy.description.id);
     input.addEventListener('change', () => onSet(input.checked));
-    row.append(lab, input);
+    row.append(copy.wrapper, input);
     return row;
   }
 
@@ -162,13 +222,12 @@ export class SettingsPanel {
     label: string,
     value: string,
     onSet: (value: string) => void,
+    description?: string,
   ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'setting-row';
     const id = controlId(label);
-    const lab = document.createElement('label');
-    lab.htmlFor = id;
-    lab.textContent = label;
+    const copy = this.settingCopy(label, id, description);
     const control = document.createElement('div');
     control.className = 'color-control';
     const input = document.createElement('input');
@@ -176,6 +235,7 @@ export class SettingsPanel {
     input.name = id;
     input.type = 'color';
     input.value = value;
+    if (copy.description) input.setAttribute('aria-describedby', copy.description.id);
     const text = document.createElement('span');
     text.className = 'color-value';
     text.textContent = value;
@@ -184,7 +244,7 @@ export class SettingsPanel {
       onSet(input.value);
     });
     control.append(input, text);
-    row.append(lab, control);
+    row.append(copy.wrapper, control);
     return row;
   }
 
@@ -280,6 +340,7 @@ export class SettingsPanel {
         ],
         settings.interfaceAccent,
         (value) => this.set('interfaceAccent', value as InterfaceAccent),
+        'Changes buttons, selected states, and focus indicators. Visual trace colours are set separately below.',
       ),
     );
     interfaceSection.appendChild(
@@ -288,7 +349,7 @@ export class SettingsPanel {
         const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom interface accent')}`);
         if (toggle) toggle.checked = true;
         this.onChange();
-      }),
+      }, 'Affects interface controls only. It does not change the visual trace.'),
     );
     interfaceSection.appendChild(
       this.checkbox('Use custom interface accent', settings.useCustomInterfaceAccent, (value) =>
@@ -301,15 +362,21 @@ export class SettingsPanel {
     visual.appendChild(
       this.select(
         'Preset',
-        [{ value: '', label: 'Choose a preset' }, ...PRESETS.map((preset) => ({ value: preset.id, label: preset.label }))],
-        '',
+        [{ value: '', label: 'Custom settings' }, ...PRESETS.map((preset) => ({ value: preset.id, label: preset.label }))],
+        matchingPresetId(settings) ?? '',
         (id) => {
           const preset = PRESETS.find((candidate) => candidate.id === id);
           if (!preset) return;
+          const scrollTop = this.el.scrollTop;
           this.store.update({ ...preset.settings, useCustomColor: false });
           this.onChange();
           this.render();
+          this.el.scrollTop = scrollTop;
+          requestAnimationFrame(() => {
+            this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
+          });
         },
+        presetDescription,
       ),
     );
     visual.appendChild(
@@ -317,7 +384,11 @@ export class SettingsPanel {
         'Shape',
         MODES.map((mode) => ({ value: mode.id, label: mode.label })),
         settings.mode,
-        (value) => this.set('mode', value),
+        (value) => {
+          this.set('mode', value);
+          this.syncPresetSelection();
+        },
+        modeDescription,
       ),
     );
     visual.appendChild(
@@ -330,7 +401,9 @@ export class SettingsPanel {
           const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
           if (toggle) toggle.checked = false;
           this.onChange();
+          this.syncPresetSelection();
         },
+        'Sets the visual trace palette. Choosing a set turns off Custom colour.',
       ),
     );
     visual.appendChild(
@@ -339,24 +412,96 @@ export class SettingsPanel {
         const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
         if (toggle) toggle.checked = true;
         this.onChange();
-      }),
+        this.syncPresetSelection();
+      }, 'Changes the visual trace only, not the interface. Choosing a colour turns this on automatically.'),
     );
     visual.appendChild(
-      this.checkbox('Use custom colour', settings.useCustomColor, (value) => this.set('useCustomColor', value)),
+      this.checkbox('Use custom colour', settings.useCustomColor, (value) => {
+        this.set('useCustomColor', value);
+        this.syncPresetSelection();
+      }),
     );
     this.el.appendChild(visual);
 
     const response = this.section('Response');
-    response.appendChild(this.range('Sensitivity', 0.2, 3, 0.1, settings.sensitivity, (value) => this.set('sensitivity', value)));
-    response.appendChild(this.range('Input gain', 0.1, 4, 0.1, settings.inputGain, (value) => this.set('inputGain', value)));
-    response.appendChild(this.range('Trail length', 0.5, 0.99, 0.01, settings.persistence, (value) => this.set('persistence', value)));
-    response.appendChild(this.range('Soft glow', 0, 1.5, 0.05, settings.bloom, (value) => this.set('bloom', value)));
+    response.appendChild(
+      this.range(
+        'Sensitivity',
+        0.2,
+        3,
+        0.1,
+        settings.sensitivity,
+        (value) => this.set('sensitivity', value),
+        'Controls how strongly detected musical changes affect movement. Higher values react to smaller changes; audio volume is unchanged.',
+      ),
+    );
+    response.appendChild(
+      this.range(
+        'Input gain',
+        0.1,
+        4,
+        0.1,
+        settings.inputGain,
+        (value) => this.set('inputGain', value),
+        'Multiplies the incoming signal before drawing it. Raise quiet sources; lower it if the trace fills the frame or clipping appears. Playback volume is unchanged.',
+      ),
+    );
+    response.appendChild(
+      this.range(
+        'Trail length',
+        0.5,
+        0.99,
+        0.01,
+        settings.persistence,
+        (value) => {
+          this.set('persistence', value);
+          this.syncPresetSelection();
+        },
+        'Controls how slowly earlier lines fade. Higher values create longer, smoother trails; lower values look cleaner and faster.',
+      ),
+    );
+    response.appendChild(
+      this.range(
+        'Soft glow',
+        0,
+        1.5,
+        0.05,
+        settings.bloom,
+        (value) => {
+          this.set('bloom', value);
+          this.syncPresetSelection();
+        },
+        'Adds light around the trace. Higher values look brighter and softer but can hide fine detail.',
+      ),
+    );
     this.el.appendChild(response);
 
     const accessibility = this.section('Device and accessibility');
-    accessibility.appendChild(this.checkbox('Use less power', settings.lowPower, (value) => this.set('lowPower', value)));
-    accessibility.appendChild(this.checkbox('Reduce motion', settings.reducedMotion, (value) => this.set('reducedMotion', value)));
-    accessibility.appendChild(this.checkbox('Show diagnostics', settings.showDebug, (value) => this.set('showDebug', value)));
+    accessibility.classList.add('settings-section--device');
+    accessibility.appendChild(
+      this.checkbox(
+        'Use less power',
+        settings.lowPower,
+        (value) => this.set('lowPower', value),
+        'Renders at lower resolution and turns off glow to reduce graphics work. The trace may look softer.',
+      ),
+    );
+    accessibility.appendChild(
+      this.checkbox(
+        'Reduce motion',
+        settings.reducedMotion,
+        (value) => this.set('reducedMotion', value),
+        'Suppresses sudden bursts and animated colour flow while keeping the trace responsive to audio.',
+      ),
+    );
+    accessibility.appendChild(
+      this.checkbox(
+        'Show diagnostics',
+        settings.showDebug,
+        (value) => this.set('showDebug', value),
+        'Shows a technical overlay with frame rate, signal level, gain, clipping, frequency, and classifier data.',
+      ),
+    );
     this.el.appendChild(accessibility);
 
     const helpSection = this.section('FAQ');

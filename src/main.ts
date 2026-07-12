@@ -104,7 +104,7 @@ function main(): void {
   }
 
   const sourceNames: Readonly<Record<SourcePreference, { kicker: string; title: string }>> = {
-    demo: { kicker: 'Preview', title: 'Sample signal' },
+    demo: { kicker: 'Demo', title: 'Sample signal' },
     mic: { kicker: 'Microphone', title: 'Listening to the room' },
     system: { kicker: 'External app', title: 'Shared audio' },
     file: { kicker: 'Audio file', title: 'Local playback' },

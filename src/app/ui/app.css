@@ -582,9 +582,25 @@ input[type='range'] {
 .setting-row {
   display: grid;
   grid-template-columns: minmax(112px, 0.9fr) minmax(150px, 1.2fr);
-  align-items: center;
+  align-items: start;
   gap: 12px;
   min-width: 0;
+}
+
+.setting-copy {
+  min-width: 0;
+}
+
+.setting-copy label {
+  display: block;
+}
+
+.setting-description {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .setting-row label,
@@ -624,16 +640,23 @@ input[type='range'] {
 
 .toggle-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   min-height: 38px;
 }
 
 .toggle-row input[type='checkbox'] {
+  flex: 0 0 auto;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
   accent-color: var(--accent);
+}
+
+.settings-section--device {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .color-control {
