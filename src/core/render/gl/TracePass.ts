@@ -32,17 +32,22 @@ vec3 norwegianColor(float t) {
 }
 
 vec3 norwegianFlagColor(float phase) {
-  // Keep all three flag colors spatially present across the live trace while
-  // the field rolls. White is restrained before additive persistence/bloom.
-  const vec3 red = vec3(0.78, 0.015, 0.09);
-  const vec3 white = vec3(0.72, 0.75, 0.82);
-  const vec3 blue = vec3(0.0, 0.04, 0.34);
+  // Strong fabric-like flag colours arranged as one seamless horizontal cycle:
+  // deep red -> red -> warm white -> navy -> royal blue -> white -> red.
+  const vec3 deepRed = vec3(0.52, 0.045, 0.095);
+  const vec3 red = vec3(0.90, 0.075, 0.14);
+  const vec3 white = vec3(0.94, 0.90, 0.88);
+  const vec3 navy = vec3(0.015, 0.15, 0.42);
+  const vec3 blue = vec3(0.20, 0.36, 0.74);
 
   float p = fract(phase);
-  if (p < 0.25) return mix(red, white, smoothstep(0.0, 0.25, p));
-  if (p < 0.5) return mix(white, blue, smoothstep(0.25, 0.5, p));
-  if (p < 0.75) return mix(blue, white, smoothstep(0.5, 0.75, p));
-  return mix(white, red, smoothstep(0.75, 1.0, p));
+  if (p < 0.12) return mix(deepRed, red, smoothstep(0.0, 0.12, p));
+  if (p < 0.27) return mix(red, white, smoothstep(0.12, 0.27, p));
+  if (p < 0.38) return mix(white, navy, smoothstep(0.27, 0.38, p));
+  if (p < 0.55) return mix(navy, blue, smoothstep(0.38, 0.55, p));
+  if (p < 0.70) return mix(blue, white, smoothstep(0.55, 0.70, p));
+  if (p < 0.84) return mix(white, red, smoothstep(0.70, 0.84, p));
+  return mix(red, deepRed, smoothstep(0.84, 1.0, p));
 }
 
 void main() {
@@ -56,19 +61,15 @@ void main() {
     float band = 0.5 + 0.5 * sin(6.28318530718 * phase - 1.57079632679);
     emission = norwegianColor(band) * uIntensity;
   } else if (uColorMode == 2) {
-    // NorwegianFlag normalizes color coordinates to the live trace bounds so
-    // red, white and blue remain present together regardless of trace scale.
+    // NorwegianFlag normalizes the horizontal colour coordinate to the live
+    // trace bounds, preserving a left-to-right flag sequence at every scale.
     vec2 minP = uTraceBounds.xy;
     vec2 span = max(uTraceBounds.zw - minP, vec2(0.0001));
-    vec2 local = clamp((vPos - minP) / span, 0.0, 1.0);
+    float localX = clamp((vPos.x - minP.x) / span.x, 0.0, 1.0);
 
-    // Primarily horizontal, with restrained inside-out/outside-in variation.
-    // Only color coordinates move; geometry and every existing mode stay intact.
-    float radius = clamp(length(local - vec2(0.5)) * 1.41421356, 0.0, 1.0);
-    float radialMix = 0.08 + 0.10 * (0.5 + 0.5 * sin(uFlowTime * 0.19));
-    float field = mix(local.x, radius, radialMix);
-    float ripple = 0.055 * sin(field * 12.56637061 - uFlowTime * 0.72);
-    float phase = field + ripple - uFlowTime * 0.075;
+    // Move only the repeating colour cycle from left to right. Geometry and
+    // every existing rendering mode remain untouched.
+    float phase = localX - uFlowTime * 0.055;
     emission = norwegianFlagColor(phase) * uIntensity;
   } else {
     // Existing palettes retain their exact uniform-color behavior.
