@@ -5,6 +5,7 @@ import type {
   SettingsStore,
 } from '../SettingsStore';
 import { matchingPresetId, PRESETS } from '../../core/grammar/presets';
+import { CustomPresetStore } from '../../core/grammar/CustomPresetStore';
 import { PALETTE_IDS, paletteLabel } from '../../core/grammar/palettes';
 import { MODES } from '../../core/render/modes';
 
@@ -14,7 +15,16 @@ function controlId(label: string): string {
 }
 
 const CUSTOM_PRESET_DESCRIPTION =
-  'Current controls do not exactly match a preset. Choose one to apply a complete visual style.';
+  'Current controls do not exactly match a preset. Save them as a named preset or choose an existing preset.';
+const SAVED_PRESET_DESCRIPTION =
+  'Saved on this device. Editing a visual control creates unsaved Custom settings without changing the saved preset.';
+const CUSTOM_PRESET_PREFIX = 'custom:';
+
+interface SelectOption {
+  value: string;
+  label: string;
+  group?: string;
+}
 
 const MODE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   'stereo-xy': 'Maps the left channel horizontally and the right channel vertically. Stereo width and panning change the figure.',
@@ -24,10 +34,6 @@ const MODE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   'hybrid-grammar': 'Combines stereo, frequency, and transient features. More reactive and complex than the other shapes.',
 };
 
-function presetDescription(id: string): string {
-  return PRESETS.find((preset) => preset.id === id)?.description ?? CUSTOM_PRESET_DESCRIPTION;
-}
-
 function modeDescription(id: string): string {
   return MODE_DESCRIPTIONS[id] ?? 'Changes how the incoming audio is translated into the visual shape.';
 }
@@ -35,6 +41,7 @@ function modeDescription(id: string): string {
 /** Accessible, dependency-free settings modal backed by the persistent store. */
 export class SettingsPanel {
   private readonly el: HTMLElement;
+  private readonly customPresets = new CustomPresetStore();
   private lastFocus: HTMLElement | null = null;
 
   constructor(
@@ -113,19 +120,100 @@ export class SettingsPanel {
     return { wrapper, description: paragraph };
   }
 
+  private presetValue(settings: Readonly<Settings> = this.store.get()): string {
+    const custom = this.customPresets.matching(settings);
+    if (custom) return `${CUSTOM_PRESET_PREFIX}${custom.id}`;
+    return matchingPresetId(settings) ?? '';
+  }
+
+  private presetDescription(value: string): string {
+    if (value.startsWith(CUSTOM_PRESET_PREFIX)) return SAVED_PRESET_DESCRIPTION;
+    return PRESETS.find((preset) => preset.id === value)?.description ?? CUSTOM_PRESET_DESCRIPTION;
+  }
+
+  private syncPresetActions(value: string): void {
+    const save = this.el.querySelector<HTMLButtonElement>('#vf-save-current-preset');
+    const remove = this.el.querySelector<HTMLButtonElement>('#vf-delete-saved-preset');
+    if (save) {
+      save.disabled = value !== '';
+      save.title = save.disabled
+        ? 'Change a visual setting first; named presets are already saved.'
+        : 'Save the current visual settings under a custom name.';
+    }
+    if (remove) remove.disabled = !value.startsWith(CUSTOM_PRESET_PREFIX);
+  }
+
   private syncPresetSelection(): void {
     const select = this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`);
     if (!select) return;
-    const id = matchingPresetId(this.store.get()) ?? '';
-    select.value = id;
+    const value = this.presetValue();
+    select.value = value;
     const descriptionId = select.getAttribute('aria-describedby');
     const description = descriptionId ? this.el.querySelector<HTMLElement>(`#${descriptionId}`) : null;
-    if (description) description.textContent = presetDescription(id);
+    if (description) description.textContent = this.presetDescription(value);
+    this.syncPresetActions(value);
+  }
+
+  private presetActions(): HTMLElement {
+    const actions = document.createElement('div');
+    actions.className = 'preset-actions';
+
+    const save = document.createElement('button');
+    save.id = 'vf-save-current-preset';
+    save.type = 'button';
+    save.textContent = 'Save current preset';
+    save.disabled = this.presetValue() !== '';
+    save.title = save.disabled
+      ? 'Change a visual setting first; named presets are already saved.'
+      : 'Save the current visual settings under a custom name.';
+    save.addEventListener('click', () => {
+      const name = globalThis.prompt('Name this preset (1–40 characters):');
+      if (name === null) return;
+      try {
+        this.customPresets.save(name, this.store.get());
+        const scrollTop = this.el.scrollTop;
+        this.render();
+        this.el.scrollTop = scrollTop;
+        requestAnimationFrame(() => {
+          this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
+        });
+      } catch (error) {
+        globalThis.alert(error instanceof Error ? error.message : 'The preset could not be saved.');
+      }
+    });
+
+    const remove = document.createElement('button');
+    remove.id = 'vf-delete-saved-preset';
+    remove.className = 'preset-delete';
+    remove.type = 'button';
+    remove.textContent = 'Delete saved preset';
+    remove.disabled = !this.presetValue().startsWith(CUSTOM_PRESET_PREFIX);
+    remove.addEventListener('click', () => {
+      const value = this.presetValue();
+      if (!value.startsWith(CUSTOM_PRESET_PREFIX)) return;
+      const preset = this.customPresets.findById(value.slice(CUSTOM_PRESET_PREFIX.length));
+      if (!preset) return;
+      if (!globalThis.confirm(`Delete the saved preset “${preset.name}”?`)) return;
+      try {
+        this.customPresets.delete(preset.id);
+        const scrollTop = this.el.scrollTop;
+        this.render();
+        this.el.scrollTop = scrollTop;
+        requestAnimationFrame(() => {
+          this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
+        });
+      } catch (error) {
+        globalThis.alert(error instanceof Error ? error.message : 'The preset could not be deleted.');
+      }
+    });
+
+    actions.append(save, remove);
+    return actions;
   }
 
   private select(
     label: string,
-    options: { value: string; label: string }[],
+    options: SelectOption[],
     value: string,
     onSet: (value: string) => void,
     description?: string | ((value: string) => string),
@@ -140,11 +228,23 @@ export class SettingsPanel {
     select.id = id;
     select.name = id;
     if (copy.description) select.setAttribute('aria-describedby', copy.description.id);
+    const groups = new Map<string, HTMLOptGroupElement>();
     for (const option of options) {
       const element = document.createElement('option');
       element.value = option.value;
       element.textContent = option.label;
-      select.appendChild(element);
+      if (!option.group) {
+        select.appendChild(element);
+        continue;
+      }
+      let group = groups.get(option.group);
+      if (!group) {
+        group = document.createElement('optgroup');
+        group.label = option.group;
+        groups.set(option.group, group);
+        select.appendChild(group);
+      }
+      group.appendChild(element);
     }
     select.value = value;
     select.addEventListener('change', () => {
@@ -359,16 +459,32 @@ export class SettingsPanel {
     this.el.appendChild(interfaceSection);
 
     const visual = this.section('Visual');
+    const customPresets = this.customPresets.getAll();
     visual.appendChild(
       this.select(
         'Preset',
-        [{ value: '', label: 'Custom settings' }, ...PRESETS.map((preset) => ({ value: preset.id, label: preset.label }))],
-        matchingPresetId(settings) ?? '',
-        (id) => {
-          const preset = PRESETS.find((candidate) => candidate.id === id);
-          if (!preset) return;
+        [
+          { value: '', label: 'Custom settings' },
+          ...PRESETS.map((preset) => ({
+            value: preset.id,
+            label: preset.label,
+            group: 'Built-in presets',
+          })),
+          ...customPresets.map((preset) => ({
+            value: `${CUSTOM_PRESET_PREFIX}${preset.id}`,
+            label: preset.name,
+            group: 'My presets',
+          })),
+        ],
+        this.presetValue(settings),
+        (value) => {
+          const custom = value.startsWith(CUSTOM_PRESET_PREFIX)
+            ? this.customPresets.findById(value.slice(CUSTOM_PRESET_PREFIX.length))
+            : null;
+          const settingsPatch = custom?.settings ?? PRESETS.find((candidate) => candidate.id === value)?.settings;
+          if (!settingsPatch) return;
           const scrollTop = this.el.scrollTop;
-          this.store.update({ ...preset.settings, useCustomColor: false });
+          this.store.update(settingsPatch);
           this.onChange();
           this.render();
           this.el.scrollTop = scrollTop;
@@ -376,9 +492,10 @@ export class SettingsPanel {
             this.el.querySelector<HTMLSelectElement>(`#${controlId('Preset')}`)?.focus();
           });
         },
-        presetDescription,
+        (value) => this.presetDescription(value),
       ),
     );
+    visual.appendChild(this.presetActions());
     visual.appendChild(
       this.select(
         'Shape',
@@ -431,7 +548,10 @@ export class SettingsPanel {
         3,
         0.1,
         settings.sensitivity,
-        (value) => this.set('sensitivity', value),
+        (value) => {
+          this.set('sensitivity', value);
+          this.syncPresetSelection();
+        },
         'Controls how strongly detected musical changes affect movement. Higher values react to smaller changes; audio volume is unchanged.',
       ),
     );

@@ -181,6 +181,60 @@ test('settings explain controls and keep the active preset visible', async ({ pa
   await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
 });
 
+test('custom presets preserve the edited snapshot without mutating the saved definition', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+
+  const preset = page.getByLabel('Preset');
+  await preset.selectOption('deep-bass-field');
+  await expect(page.getByLabel('Shape')).toHaveValue('stereo-xy');
+  await expect(page.getByLabel('Colour set')).toHaveValue('ice');
+  await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
+  await expect(page.getByLabel('Sensitivity')).toHaveValue('1');
+
+  await page.getByLabel('Soft glow').evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = '0.1';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  await expect(preset.locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.getByLabel('Shape')).toHaveValue('stereo-xy');
+  await expect(page.getByLabel('Colour set')).toHaveValue('ice');
+  await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
+  await expect(page.getByLabel('Sensitivity')).toHaveValue('1');
+
+  page.once('dialog', (dialog) => void dialog.accept('Night bass'));
+  await page.getByRole('button', { name: 'Save current preset' }).click();
+  await expect(preset.locator('option:checked')).toHaveText('Night bass');
+  await expect(page.locator('#vf-preset-description')).toContainText('without changing the saved preset');
+
+  await page.reload();
+  await hooks(page);
+  await page.click('#settings-btn');
+  await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Night bass');
+
+  await page.getByLabel('Trail length').evaluate((element) => {
+    const input = element as HTMLInputElement;
+    input.value = '0.7';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.getByLabel('Soft glow')).toHaveValue('0.1');
+
+  const savedValue = await page.getByLabel('Preset').locator('option', { hasText: 'Night bass' }).getAttribute('value');
+  expect(savedValue).not.toBeNull();
+  await page.getByLabel('Preset').selectOption(savedValue!);
+  await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
+  await expect(page.getByLabel('Soft glow')).toHaveValue('0.1');
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: 'Delete saved preset' }).click();
+  await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
+  await expect(page.getByLabel('Preset').locator('option', { hasText: 'Night bass' })).toHaveCount(0);
+});
+
 test('settings modal owns mobile scrolling and leaves no exposed top strip', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 700 });
   await page.goto('/');

@@ -624,6 +624,31 @@ input[type='range'] {
   color: var(--text);
 }
 
+.preset-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: -3px;
+}
+
+.preset-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+}
+
+.preset-delete {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  background: transparent;
+  color: var(--danger);
+}
+
+.preset-delete:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
 .range-wrap {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 42px;
@@ -886,6 +911,10 @@ input[type='range'] {
   .setting-row label,
   .toggle-row label {
     font-size: 0.76rem;
+  }
+
+  .preset-actions {
+    justify-content: flex-start;
   }
 
   .help-content {

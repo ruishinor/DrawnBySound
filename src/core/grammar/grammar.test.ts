@@ -114,6 +114,9 @@ describe('preset identity and guidance', () => {
     const controlledKeys = [
       'mode',
       'palette',
+      'customColor',
+      'useCustomColor',
+      'sensitivity',
       'persistence',
       'bloom',
       'baseScale',
@@ -133,6 +136,7 @@ describe('preset identity and guidance', () => {
     const applied = { ...DEFAULT_SETTINGS, ...preset!.settings };
     expect(matchingPresetId(applied)).toBe('deep-bass-field');
     expect(matchingPresetId({ ...applied, bloom: 0.1 })).toBeNull();
+    expect(matchingPresetId({ ...applied, sensitivity: 1.1 })).toBeNull();
     expect(matchingPresetId({ ...applied, useCustomColor: true })).toBeNull();
   });
 });
