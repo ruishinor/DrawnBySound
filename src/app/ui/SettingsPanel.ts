@@ -318,33 +318,62 @@ export class SettingsPanel {
     return row;
   }
 
-  private colorPicker(
+  private colorPickerWithToggle(
     label: string,
     value: string,
-    onSet: (value: string) => void,
+    enabled: boolean,
+    onColorSet: (value: string) => void,
+    toggleLabel: string,
+    onToggle: (value: boolean) => void,
     description?: string,
   ): HTMLElement {
     const row = document.createElement('div');
-    row.className = 'setting-row';
+    row.className = 'setting-row setting-row--color-toggle';
+
     const id = controlId(label);
+    const toggleId = controlId(toggleLabel);
     const copy = this.settingCopy(label, id, description);
-    const control = document.createElement('div');
-    control.className = 'color-control';
+
+    const controls = document.createElement('div');
+    controls.className = 'color-toggle-control';
+
+    const colorControl = document.createElement('div');
+    colorControl.className = 'color-control';
+
+    const text = document.createElement('span');
+    text.className = 'color-value';
+    text.textContent = value;
+
     const input = document.createElement('input');
     input.id = id;
     input.name = id;
     input.type = 'color';
     input.value = value;
     if (copy.description) input.setAttribute('aria-describedby', copy.description.id);
-    const text = document.createElement('span');
-    text.className = 'color-value';
-    text.textContent = value;
     input.addEventListener('input', () => {
       text.textContent = input.value;
-      onSet(input.value);
+      onColorSet(input.value);
     });
-    control.append(input, text);
-    row.append(copy.wrapper, control);
+    colorControl.append(text, input);
+
+    const toggleControl = document.createElement('div');
+    toggleControl.className = 'inline-toggle';
+
+    const toggleCopy = document.createElement('label');
+    toggleCopy.htmlFor = toggleId;
+    toggleCopy.textContent = toggleLabel;
+
+    const toggle = document.createElement('input');
+    toggle.id = toggleId;
+    toggle.name = toggleId;
+    toggle.type = 'checkbox';
+    toggle.checked = enabled;
+    if (copy.description) toggle.setAttribute('aria-describedby', copy.description.id);
+    toggle.addEventListener('change', () => onToggle(toggle.checked));
+
+    toggleControl.append(toggleCopy, toggle);
+    controls.append(colorControl, toggleControl);
+    row.append(copy.wrapper, controls);
     return row;
   }
 
@@ -362,7 +391,7 @@ export class SettingsPanel {
       ],
       [
         'Why is External app unavailable on my phone?',
-        'Mobile browsers generally do not expose display or app-audio capture. Use Microphone or Audio file on those devices.',
+        'Android and iOS browsers do not expose other-app audio capture to ordinary web pages. Chrome-family browsers on Android therefore show this source as desktop-only. Use Microphone or Audio file instead.',
       ],
       [
         'Why does External app sometimes have no sound?',
@@ -416,51 +445,10 @@ export class SettingsPanel {
     this.el.appendChild(header);
 
     const interfaceSection = this.section('Interface');
-    interfaceSection.appendChild(
-      this.select(
-        'Interface theme',
-        [
-          { value: 'system', label: 'Use device setting' },
-          { value: 'light', label: 'Light' },
-          { value: 'dark', label: 'Dark' },
-        ],
-        settings.appearance,
-        (value) => this.set('appearance', value as AppearancePreference),
-      ),
-    );
-    interfaceSection.appendChild(
-      this.select(
-        'Interface accent',
-        [
-          { value: 'graphite', label: 'Graphite' },
-          { value: 'moss', label: 'Moss' },
-          { value: 'plum', label: 'Plum' },
-          { value: 'clay', label: 'Clay' },
-          { value: 'slate', label: 'Slate' },
-        ],
-        settings.interfaceAccent,
-        (value) => this.set('interfaceAccent', value as InterfaceAccent),
-        'Changes buttons, selected states, and focus indicators. Visual trace colours are set separately below.',
-      ),
-    );
-    interfaceSection.appendChild(
-      this.colorPicker('Custom interface accent', settings.customInterfaceAccent, (value) => {
-        this.store.update({ customInterfaceAccent: value, useCustomInterfaceAccent: true });
-        const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom interface accent')}`);
-        if (toggle) toggle.checked = true;
-        this.onChange();
-      }, 'Affects interface controls only. It does not change the visual trace.'),
-    );
-    interfaceSection.appendChild(
-      this.checkbox('Use custom interface accent', settings.useCustomInterfaceAccent, (value) =>
-        this.set('useCustomInterfaceAccent', value),
-      ),
-    );
-    this.el.appendChild(interfaceSection);
+    interfaceSection.classList.add('settings-section--appearance');
 
-    const visual = this.section('Visual');
     const customPresets = this.customPresets.getAll();
-    visual.appendChild(
+    interfaceSection.appendChild(
       this.select(
         'Preset',
         [
@@ -495,20 +483,7 @@ export class SettingsPanel {
         (value) => this.presetDescription(value),
       ),
     );
-    visual.appendChild(this.presetActions());
-    visual.appendChild(
-      this.select(
-        'Shape',
-        MODES.map((mode) => ({ value: mode.id, label: mode.label })),
-        settings.mode,
-        (value) => {
-          this.set('mode', value);
-          this.syncPresetSelection();
-        },
-        modeDescription,
-      ),
-    );
-    visual.appendChild(
+    interfaceSection.appendChild(
       this.select(
         'Colour set',
         PALETTE_IDS.map((palette) => ({ value: palette, label: paletteLabel(palette) })),
@@ -523,22 +498,83 @@ export class SettingsPanel {
         'Sets the visual trace palette. Choosing a set turns off Custom colour.',
       ),
     );
-    visual.appendChild(
-      this.colorPicker('Custom colour', settings.customColor, (value) => {
-        this.store.update({ customColor: value, useCustomColor: true });
-        const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
-        if (toggle) toggle.checked = true;
-        this.onChange();
-        this.syncPresetSelection();
-      }, 'Changes the visual trace only, not the interface. Choosing a colour turns this on automatically.'),
+    interfaceSection.appendChild(
+      this.select(
+        'Shape',
+        MODES.map((mode) => ({ value: mode.id, label: mode.label })),
+        settings.mode,
+        (value) => {
+          this.set('mode', value);
+          this.syncPresetSelection();
+        },
+        modeDescription,
+      ),
     );
-    visual.appendChild(
-      this.checkbox('Use custom colour', settings.useCustomColor, (value) => {
-        this.set('useCustomColor', value);
-        this.syncPresetSelection();
-      }),
+    interfaceSection.appendChild(
+      this.colorPickerWithToggle(
+        'Custom colour',
+        settings.customColor,
+        settings.useCustomColor,
+        (value) => {
+          this.store.update({ customColor: value, useCustomColor: true });
+          const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom colour')}`);
+          if (toggle) toggle.checked = true;
+          this.onChange();
+          this.syncPresetSelection();
+        },
+        'Use custom colour',
+        (value) => {
+          this.set('useCustomColor', value);
+          this.syncPresetSelection();
+        },
+        'Changes the visual trace only, not the interface. Choosing a colour turns this on automatically.',
+      ),
     );
-    this.el.appendChild(visual);
+    interfaceSection.appendChild(
+      this.select(
+        'Interface theme',
+        [
+          { value: 'system', label: 'Use device setting' },
+          { value: 'light', label: 'Light' },
+          { value: 'dark', label: 'Dark' },
+        ],
+        settings.appearance,
+        (value) => this.set('appearance', value as AppearancePreference),
+      ),
+    );
+    interfaceSection.appendChild(this.presetActions());
+    interfaceSection.appendChild(
+      this.colorPickerWithToggle(
+        'Custom interface accent',
+        settings.customInterfaceAccent,
+        settings.useCustomInterfaceAccent,
+        (value) => {
+          this.store.update({ customInterfaceAccent: value, useCustomInterfaceAccent: true });
+          const toggle = this.el.querySelector<HTMLInputElement>(`#${controlId('Use custom interface accent')}`);
+          if (toggle) toggle.checked = true;
+          this.onChange();
+        },
+        'Use custom interface accent',
+        (value) => this.set('useCustomInterfaceAccent', value),
+        'Affects interface controls only. It does not change the visual trace.',
+      ),
+    );
+    interfaceSection.appendChild(
+      this.select(
+        'Interface accent',
+        [
+          { value: 'graphite', label: 'Graphite' },
+          { value: 'moss', label: 'Moss' },
+          { value: 'plum', label: 'Plum' },
+          { value: 'clay', label: 'Clay' },
+          { value: 'slate', label: 'Slate' },
+        ],
+        settings.interfaceAccent,
+        (value) => this.set('interfaceAccent', value as InterfaceAccent),
+        'Changes buttons, selected states, and focus indicators. Visual trace colours are set separately.',
+      ),
+    );
+    this.el.appendChild(interfaceSection);
 
     const response = this.section('Response');
     response.appendChild(
@@ -624,18 +660,16 @@ export class SettingsPanel {
     );
     this.el.appendChild(accessibility);
 
-    const helpSection = this.section('FAQ');
-    helpSection.appendChild(this.help());
-    this.el.appendChild(helpSection);
-
     const actions = document.createElement('section');
     actions.className = 'settings-actions';
     const reset = document.createElement('button');
     reset.className = 'panel-reset';
     reset.type = 'button';
-    reset.textContent = 'Restore defaults';
+    reset.textContent = 'Restore all visual defaults';
     reset.addEventListener('click', () => {
-      const confirmed = globalThis.confirm('Restore visual settings to their defaults? Interface and source preferences will be kept.');
+      const confirmed = globalThis.confirm(
+        'Restore all visual settings to their defaults? Interface, source, and saved presets will be kept.',
+      );
       if (!confirmed) return;
       this.store.reset();
       this.onChange();
@@ -643,5 +677,10 @@ export class SettingsPanel {
     });
     actions.appendChild(reset);
     this.el.appendChild(actions);
+
+    const helpSection = this.section('FAQ');
+    helpSection.classList.add('settings-section--faq');
+    helpSection.appendChild(this.help());
+    this.el.appendChild(helpSection);
   }
 }

@@ -235,6 +235,86 @@ test('custom presets preserve the edited snapshot without mutating the saved def
   await expect(page.getByLabel('Preset').locator('option', { hasText: 'Night bass' })).toHaveCount(0);
 });
 
+
+test('settings desktop layout matches the wide grouped target without dropping controls', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+
+  await expect(page.locator('#panel')).toBeVisible();
+  await expect(page.getByLabel('Preset')).toBeVisible();
+  await expect(page.getByLabel('Colour set')).toBeVisible();
+  await expect(page.getByLabel('Shape')).toBeVisible();
+  await expect(page.getByLabel('Custom colour', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Use custom colour')).toBeVisible();
+  await expect(page.getByLabel('Interface theme')).toBeVisible();
+  await expect(page.getByLabel('Interface accent', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Custom interface accent', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Use custom interface accent')).toBeVisible();
+
+  const headings = await page.locator('#panel > .settings-section > h3').allTextContents();
+  expect(headings).toEqual(['Interface', 'Response', 'Device and accessibility', 'FAQ']);
+
+  const faqHeading = page.locator('.settings-section--faq > h3');
+  await expect(faqHeading).toBeVisible();
+
+  const visualStyles = await page.evaluate(() => {
+    const reset = document.querySelector<HTMLElement>('.panel-reset');
+    const faq = document.querySelector<HTMLElement>('.settings-section--faq > h3');
+    if (!reset || !faq) throw new Error('Missing reset button or FAQ heading');
+    const resetStyle = getComputedStyle(reset);
+    const faqStyle = getComputedStyle(faq);
+    return {
+      resetBackground: resetStyle.backgroundColor,
+      resetColor: resetStyle.color,
+      faqFontSize: Number.parseFloat(faqStyle.fontSize),
+      faqFontWeight: Number.parseInt(faqStyle.fontWeight, 10),
+    };
+  });
+
+  expect(visualStyles.resetBackground).toBe('rgb(77, 33, 35)');
+  expect(visualStyles.resetColor).toBe('rgb(255, 255, 255)');
+  expect(visualStyles.faqFontSize).toBeGreaterThanOrEqual(14);
+  expect(visualStyles.faqFontWeight).toBeGreaterThanOrEqual(700);
+
+  const layout = await page.evaluate(() => {
+    const rect = (selector: string, closest?: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      const target = closest ? element?.closest<HTMLElement>(closest) : element;
+      if (!target) throw new Error(`Missing layout target: ${selector}`);
+      const box = target.getBoundingClientRect();
+      return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width };
+    };
+
+    return {
+      panel: rect('#panel'),
+      preset: rect('#vf-preset', '.setting-row'),
+      colour: rect('#vf-colour-set', '.setting-row'),
+      shape: rect('#vf-shape', '.setting-row'),
+      customColour: rect('#vf-custom-colour', '.setting-row'),
+      theme: rect('#vf-interface-theme', '.setting-row'),
+      presetActions: rect('.preset-actions'),
+      customAccent: rect('#vf-custom-interface-accent', '.setting-row'),
+      interfaceAccent: rect('#vf-interface-accent', '.setting-row'),
+      reset: rect('.panel-reset'),
+      faq: rect('.help-details'),
+    };
+  });
+
+  expect(layout.panel.width).toBeGreaterThanOrEqual(1080);
+  expect(Math.abs(layout.preset.top - layout.colour.top)).toBeLessThanOrEqual(4);
+  expect(layout.preset.left).toBeLessThan(layout.colour.left);
+  expect(Math.abs(layout.shape.top - layout.customColour.top)).toBeLessThanOrEqual(4);
+  expect(layout.shape.left).toBeLessThan(layout.customColour.left);
+  expect(Math.abs(layout.theme.top - layout.presetActions.top)).toBeLessThanOrEqual(4);
+  expect(layout.theme.left).toBeLessThan(layout.presetActions.left);
+  expect(Math.abs(layout.customAccent.top - layout.interfaceAccent.top)).toBeLessThanOrEqual(4);
+  expect(layout.customAccent.left).toBeLessThan(layout.interfaceAccent.left);
+  expect(layout.reset.left).toBeGreaterThan(layout.panel.left + layout.panel.width / 2);
+  expect(layout.reset.bottom).toBeLessThan(layout.faq.top);
+});
+
 test('settings modal owns mobile scrolling and leaves no exposed top strip', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 700 });
   await page.goto('/');
@@ -260,11 +340,11 @@ test('settings modal owns mobile scrolling and leaves no exposed top strip', asy
   await page.locator('#panel').evaluate((panel) => {
     panel.scrollTop = panel.scrollHeight;
   });
-  await expect(page.getByRole('button', { name: 'Restore defaults' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Restore all visual defaults' })).toBeVisible();
   await expect(page.locator('.panel-header')).toBeVisible();
 });
 
-test('restore defaults requires confirmation', async ({ page }) => {
+test('restore visual defaults requires confirmation', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
   await page.click('#settings-btn');
@@ -276,7 +356,7 @@ test('restore defaults requires confirmation', async ({ page }) => {
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
-  const reset = page.getByRole('button', { name: 'Restore defaults' });
+  const reset = page.getByRole('button', { name: 'Restore all visual defaults' });
   page.once('dialog', (dialog) => void dialog.dismiss());
   await reset.click();
   await expect(sensitivity).toHaveValue('1.7');
