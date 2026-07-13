@@ -64,6 +64,7 @@ describe('SettingsStore persistence', () => {
       interfaceAccent: 'moss',
       customInterfaceAccent: '#557755',
       useCustomInterfaceAccent: true,
+      keepScreenAwake: true,
     });
     const second = new SettingsStore();
 
@@ -76,7 +77,27 @@ describe('SettingsStore persistence', () => {
       interfaceAccent: 'moss',
       customInterfaceAccent: '#557755',
       useCustomInterfaceAccent: true,
+      keepScreenAwake: true,
     });
+  });
+
+  it('migrates settings from the previous product-name storage key', () => {
+    localStorage.setItem(
+      'vibratoflow.settings.v3',
+      JSON.stringify({
+        preferredSource: 'file',
+        appearance: 'dark',
+        keepScreenAwake: true,
+      }),
+    );
+
+    const settings = new SettingsStore().get();
+    expect(settings).toMatchObject({
+      preferredSource: 'file',
+      appearance: 'dark',
+      keepScreenAwake: true,
+    });
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).not.toBeNull();
   });
 
   it('migrates the retired theme defaults without changing other persisted preferences', () => {
@@ -92,6 +113,7 @@ describe('SettingsStore persistence', () => {
         bassDrive: 0.6,
         onsetDrive: 0.8,
         mode: 'stereo-xy',
+        keepScreenAwake: true,
         palette: 'warm-amber',
         customColor: '#c98a55',
         useCustomColor: false,
@@ -136,6 +158,7 @@ describe('SettingsStore persistence', () => {
       interfaceAccent: 'plum',
       customInterfaceAccent: '#765476',
       useCustomInterfaceAccent: true,
+      keepScreenAwake: true,
       palette: 'neon',
       bloom: 1.4,
     });
@@ -147,6 +170,7 @@ describe('SettingsStore persistence', () => {
       interfaceAccent: 'plum',
       customInterfaceAccent: '#765476',
       useCustomInterfaceAccent: true,
+      keepScreenAwake: true,
       palette: DEFAULT_SETTINGS.palette,
       bloom: DEFAULT_SETTINGS.bloom,
     });
@@ -165,6 +189,7 @@ describe('SettingsStore persistence', () => {
         customInterfaceAccent: 'red',
         useCustomInterfaceAccent: 'yes',
         lowPower: 'yes',
+        keepScreenAwake: 'yes',
       }),
     );
 
@@ -178,6 +203,7 @@ describe('SettingsStore persistence', () => {
     expect(settings.customInterfaceAccent).toBe(DEFAULT_SETTINGS.customInterfaceAccent);
     expect(settings.useCustomInterfaceAccent).toBe(false);
     expect(settings.lowPower).toBe(false);
+    expect(settings.keepScreenAwake).toBe(false);
   });
 });
 
@@ -193,6 +219,7 @@ describe('sanitizeSettings', () => {
         customInterfaceAccent: '#AABBCC',
         useCustomInterfaceAccent: true,
         mode: 'stereo-xy',
+        keepScreenAwake: true,
       }),
     ).toEqual({
       customColor: '#aa00ff',
@@ -203,6 +230,7 @@ describe('sanitizeSettings', () => {
       customInterfaceAccent: '#aabbcc',
       useCustomInterfaceAccent: true,
       mode: 'stereo-xy',
+      keepScreenAwake: true,
     });
   });
 });

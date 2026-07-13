@@ -72,7 +72,7 @@ export class AudioGraph {
       const bus = FeatureBus.create();
       const specBus = SpectralBus.create();
       const classBus = ClassBus.create();
-      node = new AudioWorkletNode(ctx, 'vibrato-preprocessor', {
+      node = new AudioWorkletNode(ctx, 'drawn-by-sound-preprocessor', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         outputChannelCount: [1],

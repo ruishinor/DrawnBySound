@@ -7,7 +7,7 @@
   let useCustomAccent = false;
 
   try {
-    for (const key of ['vibratoflow.settings.v3', 'vibratoflow.settings.v2']) {
+    for (const key of ['drawn-by-sound.settings.v1', 'vibratoflow.settings.v3', 'vibratoflow.settings.v2']) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
       const stored = JSON.parse(raw);

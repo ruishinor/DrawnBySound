@@ -1,13 +1,13 @@
-# VibratoFlow — adversarial audit and implementation report
+# Drawn by Sound — adversarial audit and implementation report
 
 Date: 2026-07-11
-Scope: uploaded repository `VibratoFlow 26-07-11 0600 minus_node_modules.zip`, the two supplied desktop/mobile screenshots, and the implementation changes described below.
+Scope: uploaded repository `Drawn by Sound 26-07-11 0600 minus_node_modules.zip`, the two supplied desktop/mobile screenshots, and the implementation changes described below.
 
 ## 1. Internal plan before coding
 
 ### Audience
 
-VibratoFlow is for casual listeners, musicians, creators, projection users, and people who want an immediate visual response to music without accounts or cloud processing. The primary interaction must work on a phone while listening, not only on a desktop development machine.
+Drawn by Sound is for casual listeners, musicians, creators, projection users, and people who want an immediate visual response to music without accounts or cloud processing. The primary interaction must work on a phone while listening, not only on a desktop development machine.
 
 ### Not the audience
 
@@ -15,7 +15,7 @@ It is not a DAW, a professional metering suite, a game HUD, a tactical display, 
 
 ### Brand signals to preserve
 
-- The VibratoFlow name.
+- The Drawn by Sound name.
 - The live oscilloscope trace as the central product, not background decoration.
 - Local audio processing and explicit source choice.
 - Direct microphone, file, and supported shared-audio workflows.
@@ -219,7 +219,7 @@ Primary engineering bottleneck: source lifecycle and capability truthfulness, no
 
 ### Phase 3 — make persistence honest and resilient
 
-[Version the persisted settings schema] → verify: v1 data migrates to `vibratoflow.settings.v2` without discarding valid values.
+[Version the persisted settings schema] → verify: former-product settings migrate to `drawn-by-sound.settings.v1` without discarding valid values.
 
 [Sanitize all loaded and updated values] → verify: malformed JSON is ignored; non-finite/out-of-range numeric values are rejected or clamped; invalid source and colour values fall back safely.
 

@@ -1,10 +1,10 @@
-# VibratoFlow implementation notes — 2026-07-11
+# Drawn by Sound implementation notes — 2026-07-11
 
 ## Brand and audience calibration
 
 1. Audience: people who want an immediate, low-friction visual response to music on a phone or desktop; casual listeners, musicians, creators, and projection users who value privacy and legibility over technical spectacle.
 2. Not for: a DAW replacement, professional metering suite, game HUD, tactical interface, crypto/SaaS dashboard, or an "AI music" product.
-3. Preserve: the VibratoFlow name, the live oscilloscope geometry, local processing, microphone/file/system-source choices, PNG export, and advanced visual controls.
+3. Preserve: the Drawn by Sound name, the live oscilloscope geometry, local processing, microphone/file/system-source choices, PNG export, and advanced visual controls.
 4. Avoid: black-plus-neon as the full interface, purple/teal gradients, glassmorphism, pill-button rows, glowing borders, emoji controls, tiny low-contrast status text, dashboard cards, and decorative metrics.
 5. Appropriate references: restrained music-player controls, physical audio equipment, editorial exhibition labels, gallery projection software, and warm neutral material palettes. References guide hierarchy and tactility, not imitation.
 6. Emotional target: calm, immersive, deliberate, and trustworthy. The visual should feel like the instrument; the interface should recede.

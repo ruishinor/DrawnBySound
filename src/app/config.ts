@@ -1,8 +1,5 @@
-/**
- * Finalized product name. Replaces the legacy PRD working title "OscilloFlow".
- * Use APP_NAME everywhere a product name is shown.
- */
-export const APP_NAME = 'VibratoFlow';
+/** Product identity used by all user-facing status and metadata. */
+export const APP_NAME = 'Drawn by Sound';
 
 export const APP_TAGLINE =
   'Real-time oscilloscope art that listens to music, detects its musical character, ' +

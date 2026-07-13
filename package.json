@@ -1,9 +1,9 @@
 {
-  "name": "vibratoflow",
+  "name": "drawn-by-sound",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "VibratoFlow — local-first, real-time music-interpretation oscilloscope visualizer.",
+  "description": "Drawn by Sound — local-first, real-time music-interpretation oscilloscope visualizer.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/verify-dist.mjs && node scripts/verify-security-config.mjs",

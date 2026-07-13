@@ -1,4 +1,4 @@
-# VibratoFlow — manual acceptance checklist
+# Drawn by Sound — manual acceptance checklist
 
 Use this only after `npm ci`, typecheck, unit tests, build, production audit, and both Playwright suites pass. Record exact device, OS, browser, commit, and deployment URL.
 
@@ -67,7 +67,7 @@ Use this only after `npm ci`, typecheck, unit tests, build, production audit, an
 - [ ] Cancel the browser chooser: status is recoverable and no source remains falsely active.
 - [ ] Select a surface without audio: the app explains that no usable audio track was received.
 - [ ] Select a supported tab/window/screen with audio: geometry responds and the source is visibly active.
-- [ ] End sharing from the browser indicator: VibratoFlow stops and asks to reconnect.
+- [ ] End sharing from the browser indicator: Drawn by Sound stops and asks to reconnect.
 - [ ] Test Spotify, YouTube, browser media, Instagram/multi-view, and BlackPlayer only as named observations; record each pass/fail without generalising.
 - [ ] On mobile browsers where capture is unavailable, Other app is disabled or fails honestly and recommends file/microphone.
 
@@ -106,3 +106,13 @@ Release only when:
 - [ ] Other-app limitations are visible in product copy.
 - [ ] No claim of canonical lyrics or universal app capture is present.
 - [ ] Remaining defects have severity, reproduction steps, and an explicit release decision.
+
+
+## Fullscreen and screen-awake acceptance
+
+- Enter native fullscreen from the bottom-right visual control where supported; otherwise confirm the UI explicitly reports Expanded view.
+- Exit with the same control and with Escape without stopping, restarting, or changing the active audio source.
+- Confirm the 44 px control remains reachable inside phone safe areas and fades without disappearing completely.
+- Enable Keep screen awake, leave the page visible beyond the normal display timeout, then disable it and confirm normal timeout behavior returns.
+- Background and restore the page; confirm a selected wake-lock preference is reacquired only after the page is visible.
+- On an unsupported browser, confirm the setting is disabled and the FAQ points to the phone display-timeout setting.

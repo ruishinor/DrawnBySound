@@ -29,7 +29,7 @@ const CROSS_ORIGIN_HEADERS: Readonly<Record<string, string>> = {
 const PREVIEW_SECURITY_HEADERS: Readonly<Record<string, string>> = {
   ...CROSS_ORIGIN_HEADERS,
   'Content-Security-Policy': PREVIEW_CSP,
-  'Permissions-Policy': 'microphone=(self), display-capture=(self), camera=(), geolocation=(), payment=(), usb=()',
+  'Permissions-Policy': 'microphone=(self), display-capture=(self), fullscreen=(self), screen-wake-lock=(self), camera=(), geolocation=(), payment=(), usb=()',
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -53,7 +53,7 @@ function applyHeaders(headers: Readonly<Record<string, string>>) {
  */
 function browserSecurityHeaders(): Plugin {
   return {
-    name: 'vibratoflow:browser-security-headers',
+    name: 'drawn-by-sound:browser-security-headers',
     configureServer(server) {
       server.middlewares.use(applyHeaders(CROSS_ORIGIN_HEADERS));
     },

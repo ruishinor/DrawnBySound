@@ -309,7 +309,7 @@ input:disabled {
   left: 16px;
   bottom: 14px;
   z-index: 2;
-  max-width: calc(100% - 32px);
+  max-width: calc(100% - 88px);
   color: var(--stage-text);
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.72);
   pointer-events: none;
@@ -335,6 +335,95 @@ input:disabled {
   font-weight: 450;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.stage-action {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9px;
+  background: rgba(12, 14, 15, 0.46);
+  color: rgba(245, 247, 246, 0.78);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  opacity: 0.58;
+  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stage-action:hover,
+.stage-action:focus-visible,
+.stage-action:active {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(12, 14, 15, 0.72);
+  color: #ffffff;
+  opacity: 1;
+}
+
+.fullscreen-toggle {
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.fullscreen-icon {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fullscreen-icon--exit,
+.fullscreen-toggle[aria-pressed='true'] .fullscreen-icon--enter {
+  display: none;
+}
+
+.fullscreen-toggle[aria-pressed='true'] .fullscreen-icon--exit {
+  display: block;
+}
+
+.stage[data-controls-idle='true'] .stage-action:not(:focus-visible) {
+  background: rgba(12, 14, 15, 0.18);
+  border-color: rgba(255, 255, 255, 0.08);
+  opacity: 0.18;
+}
+
+body.visual-expanded {
+  overflow: hidden;
+}
+
+.stage--expanded,
+.stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  background: var(--stage);
+}
+
+.stage--expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.stage:fullscreen {
+  max-width: none;
+  max-height: none;
+}
+
+.stage--expanded .stage-label,
+.stage:fullscreen .stage-label {
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
 }
 
 .control-deck {
@@ -743,13 +832,13 @@ input[type='range'] {
   cursor: pointer;
 }
 
-#vf-save-current-preset {
+#dbs-save-current-preset {
   border-color: var(--text);
   background: var(--text);
   color: var(--surface-raised);
 }
 
-#vf-save-current-preset:hover:not(:disabled) {
+#dbs-save-current-preset:hover:not(:disabled) {
   filter: brightness(0.94);
 }
 
@@ -821,7 +910,7 @@ input[type='range'] {
 }
 
 .settings-section--device {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 24px;
 }
 
@@ -973,6 +1062,11 @@ input[type='range'] {
   .stage-label {
     left: 12px;
     bottom: 10px;
+  }
+
+  .fullscreen-toggle {
+    right: max(9px, env(safe-area-inset-right));
+    bottom: max(9px, env(safe-area-inset-bottom));
   }
 
   .control-deck {

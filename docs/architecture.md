@@ -1,6 +1,6 @@
-# VibratoFlow — architecture
+# Drawn by Sound — architecture
 
-VibratoFlow is a framework-free, local-first, real-time music visualizer. The 2026-07-11 design pass changes the product shell, settings boundary, and source-state presentation without replacing the DSP or rendering pipeline.
+Drawn by Sound is a framework-free, local-first, real-time music visualizer. The 2026-07-11 design pass changes the product shell, settings boundary, and source-state presentation without replacing the DSP or rendering pipeline.
 
 ## Runtime pipeline
 
@@ -41,15 +41,15 @@ index.html
 
 ## Settings boundary
 
-`SettingsStore` persists visual preferences and `preferredSource` to `localStorage` under `vibratoflow.settings.v2`.
+`SettingsStore` persists visual, interface, source, and screen-awake preferences to `localStorage` under `drawn-by-sound.settings.v1`. It migrates valid data from the former product keys without deleting user choices.
 
 The store:
 
-- migrates valid v1 settings;
+- migrates valid settings from the former product keys;
 - rejects malformed structures;
 - clamps numeric values to supported bounds;
 - validates custom hex colour and source enum values;
-- preserves preferred source when visual defaults are restored;
+- preserves interface, preferred source, and screen-awake preferences when visual defaults are restored;
 - does not persist active media handles, file objects, browser permissions, PCM, or transcript data.
 
 Preferred source is not active source. Microphone, shared display audio, and local files require a new user gesture after reload.
@@ -65,6 +65,12 @@ One active presentation source exists at a time:
 - Stop selects an explicit silence source and pauses analysis.
 
 Capture tracks are observed for external termination. Every user source change advances a source-session revision and stops the current source. A permission or file operation that resolves after a newer action is treated as stale and its acquired handle is stopped instead of becoming active.
+
+## Visual presentation and display wake lock
+
+`VisualFullscreenController` presents only the visual stage. It requests native element fullscreen after the user presses the standard corner control and falls back to an explicitly labelled viewport-filling expanded view if the browser does not provide or refuses the Fullscreen API. The fallback preserves scroll position and does not restart or replace the active audio source.
+
+`ScreenWakeLockController` is an opt-in progressive enhancement. It requests a screen wake lock only while the page is visible, releases it when disabled or hidden, and revision-guards pending requests so a late result cannot remain active after the preference changes. Unsupported browsers leave the control disabled and the FAQ points to the phone's own display timeout setting.
 
 ## Rendering invariants
 

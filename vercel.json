@@ -22,7 +22,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "microphone=(self), display-capture=(self), camera=(), geolocation=(), payment=(), usb=()"
+          "value": "microphone=(self), display-capture=(self), fullscreen=(self), screen-wake-lock=(self), camera=(), geolocation=(), payment=(), usb=()"
         },
         {
           "key": "Referrer-Policy",

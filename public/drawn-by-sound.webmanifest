@@ -1,6 +1,6 @@
 {
-  "name": "VibratoFlow",
-  "short_name": "VibratoFlow",
+  "name": "Drawn by Sound",
+  "short_name": "Drawn by Sound",
   "description": "Local-first, real-time music-interpretation oscilloscope visualizer.",
   "id": "/",
   "start_url": "/",
@@ -10,19 +10,19 @@
   "theme_color": "#1b1d1f",
   "icons": [
     {
-      "src": "/Flow-icon-192.png",
+      "src": "/drawn-by-sound-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/Flow-icon-512.png",
+      "src": "/drawn-by-sound-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/Flow-apple-touch-icon.png",
+      "src": "/drawn-by-sound-apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
