@@ -22,14 +22,21 @@ export async function startSystemCapture(graph: AudioGraph): Promise<MicHandle> 
   // We only need audio — drop the video track immediately.
   for (const t of stream.getVideoTracks()) t.stop();
 
-  await graph.resume();
-  const src = graph.ctx.createMediaStreamSource(stream);
-  graph.connectInput(src);
-  return {
-    stream,
-    stop() {
-      src.disconnect();
-      for (const t of stream.getTracks()) t.stop();
-    },
-  };
+  let src: MediaStreamAudioSourceNode | null = null;
+  try {
+    await graph.resume();
+    src = graph.ctx.createMediaStreamSource(stream);
+    graph.connectInput(src);
+    return {
+      stream,
+      stop() {
+        src?.disconnect();
+        for (const t of stream.getAudioTracks()) t.stop();
+      },
+    };
+  } catch (error) {
+    src?.disconnect();
+    for (const t of stream.getAudioTracks()) t.stop();
+    throw error;
+  }
 }

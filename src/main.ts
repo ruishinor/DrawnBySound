@@ -4,7 +4,7 @@ import { Renderer } from './core/render/Renderer';
 import { MODE_BY_ID, StereoXY, type ModeContext } from './core/render/modes';
 import type { AudioFrameSource } from './core/capture/AudioFrameSource';
 import { SyntheticSource } from './core/capture/SyntheticSource';
-import { decodeAudioFile } from './core/capture/FileAdapter';
+import { decodeAudioFile, shouldUseMediaElement } from './core/capture/FileAdapter';
 import { AudioGraph } from './core/pipeline/AudioGraph';
 import { FilePlayer } from './core/pipeline/FilePlayer';
 import { MediaFilePlayer } from './core/pipeline/MediaFilePlayer';
@@ -29,6 +29,7 @@ import {
   describeMicrophoneFailure,
   describePlaybackFailure,
 } from './core/capture/AudioErrors';
+import { SourceSessionCoordinator } from './app/SourceSessionCoordinator';
 
 const WINDOW = 2048;
 
@@ -139,10 +140,12 @@ function main(): void {
   const preferredSource = store.get().preferredSource;
   let source: AudioFrameSource = preferredSource === 'demo' ? new SyntheticSource() : SILENCE;
   let graph: AudioGraph | null = null;
+  let graphPromise: Promise<AudioGraph> | null = null;
   let liveBus: FeatureBus | null = null;
   let micHandle: MicHandle | null = null;
   let oscHandle: OscillatorHandle | null = null;
   let player: TransportPlayer | null = null;
+  const sourceSessions = new SourceSessionCoordinator();
 
   const left = new Float32Array(WINDOW);
   const right = new Float32Array(WINDOW);
@@ -181,9 +184,22 @@ function main(): void {
   };
 
   const ensureGraph = async (): Promise<AudioGraph> => {
-    graph ??= await AudioGraph.create();
+    if (!graph) {
+      graphPromise ??= AudioGraph.create();
+      try {
+        graph = await graphPromise;
+      } finally {
+        graphPromise = null;
+      }
+    }
     await graph.resume();
     return graph;
+  };
+
+  const beginSourceChange = (): number => {
+    const revision = sourceSessions.begin();
+    stopAll();
+    return revision;
   };
 
   const watchCaptureEnd = (handle: MicHandle, label: string): void => {
@@ -200,9 +216,13 @@ function main(): void {
     g: AudioGraph,
     nextPlayer: TransportPlayer,
     label: string,
-  ): Promise<void> => {
+    revision: number,
+  ): Promise<boolean> => {
+    const activePlayer = sourceSessions.adopt(revision, nextPlayer);
+    if (!activePlayer) return false;
+
     g.resumeAnalysis(); // fresh normalizer state per source (§15.4)
-    player = nextPlayer;
+    player = activePlayer;
     liveBus = g.bus;
     source = new LiveSource(g.ring, g.ctx.sampleRate);
     if (transportEl) transportEl.hidden = false;
@@ -211,16 +231,25 @@ function main(): void {
       seekEl.value = '0';
     }
     try {
-      await player.play();
+      await activePlayer.play();
+      if (!sourceSessions.isCurrent(revision)) {
+        activePlayer.stop();
+        return false;
+      }
       setSourcePresentation('file', label, true);
       setStatus(`${APP_NAME} — ${label}`);
+      return true;
     } catch (error) {
+      if (!sourceSessions.isCurrent(revision)) {
+        activePlayer.stop();
+        return false;
+      }
       const name = error instanceof Error ? error.name : '';
       if (name === 'NotAllowedError') {
         setSourcePresentation('file', label, true);
         setStatus(`${APP_NAME} — ${label} · ${describePlaybackFailure(error)}`);
         console.warn('Autoplay did not start:', error);
-        return;
+        return true;
       }
       stopAll();
       throw error;
@@ -231,8 +260,9 @@ function main(): void {
     g: AudioGraph,
     buffer: AudioBuffer,
     label: string,
-  ): Promise<void> => {
-    await activatePlayer(g, new FilePlayer(g, buffer), label);
+    revision: number,
+  ): Promise<boolean> => {
+    return activatePlayer(g, new FilePlayer(g, buffer), label, revision);
   };
 
   // --- controls --------------------------------------------------------------
@@ -248,7 +278,7 @@ function main(): void {
   });
 
   document.getElementById('demo')?.addEventListener('click', () => {
-    stopAll();
+    beginSourceChange();
     source = new SyntheticSource();
     setSourcePresentation('demo', undefined, true);
     setStatus(`${APP_NAME} — sample signal`);
@@ -257,19 +287,21 @@ function main(): void {
   // Explicit stop/listening state (PRD §19.1, §23-14): halt all capture and
   // playback; the trace decays to black rather than freezing.
   document.getElementById('stop')?.addEventListener('click', () => {
-    stopAll();
+    beginSourceChange();
     source = SILENCE;
     setSourcePresentation(null, 'Not listening');
     setStatus(`${APP_NAME} — stopped · not listening`);
   });
 
   document.getElementById('mic')?.addEventListener('click', () => {
+    const revision = beginSourceChange();
     setStatus(`${APP_NAME} — starting audio engine…`);
     void (async () => {
       let g: AudioGraph;
       try {
         g = await ensureGraph();
       } catch (error) {
+        if (!sourceSessions.isCurrent(revision)) return;
         stopAll();
         source = new SyntheticSource();
         setSourcePresentation('demo');
@@ -278,17 +310,21 @@ function main(): void {
         return;
       }
 
-      stopAll();
+      if (!sourceSessions.isCurrent(revision)) return;
       g.resumeAnalysis();
       setStatus(`${APP_NAME} — requesting microphone permission…`);
       try {
-        micHandle = await startMic(g);
+        const started = await startMic(g);
+        const adopted = sourceSessions.adopt(revision, started);
+        if (!adopted) return;
+        micHandle = adopted;
         liveBus = g.bus;
         source = new LiveSource(g.ring, g.ctx.sampleRate);
         watchCaptureEnd(micHandle, 'Microphone');
         setSourcePresentation('mic', undefined, true);
         setStatus(`${APP_NAME} — listening (microphone)`);
       } catch (error) {
+        if (!sourceSessions.isCurrent(revision)) return;
         stopAll();
         source = new SyntheticSource();
         setSourcePresentation('demo');
@@ -301,11 +337,13 @@ function main(): void {
   // System / other-app audio capture (best-effort, PRD §13.4). Returns a status
   // string so the same logic backs both the button and the test hook.
   const startSystemMode = async (): Promise<string> => {
+    const revision = beginSourceChange();
     setStatus(`${APP_NAME} — starting system-audio capture…`);
     let g: AudioGraph;
     try {
       g = await ensureGraph();
     } catch (error) {
+      if (!sourceSessions.isCurrent(revision)) return `${APP_NAME} — source request cancelled`;
       stopAll();
       source = new SyntheticSource();
       setSourcePresentation('demo');
@@ -315,10 +353,13 @@ function main(): void {
       return msg;
     }
 
-    stopAll();
+    if (!sourceSessions.isCurrent(revision)) return `${APP_NAME} — source request cancelled`;
     g.resumeAnalysis();
     try {
-      micHandle = await startSystemCapture(g); // shares the MicHandle shape
+      const started = await startSystemCapture(g); // shares the MicHandle shape
+      const adopted = sourceSessions.adopt(revision, started);
+      if (!adopted) return `${APP_NAME} — source request cancelled`;
+      micHandle = adopted;
       liveBus = g.bus;
       source = new LiveSource(g.ring, g.ctx.sampleRate);
       watchCaptureEnd(micHandle, 'Shared audio');
@@ -327,6 +368,7 @@ function main(): void {
       setStatus(msg);
       return msg;
     } catch (error) {
+      if (!sourceSessions.isCurrent(revision)) return `${APP_NAME} — source request cancelled`;
       // Cancellation/denial is an expected outcome of the browser share picker.
       stopAll();
       const errorName = error instanceof Error ? error.name : '';
@@ -394,6 +436,7 @@ function main(): void {
   fileInput?.addEventListener('change', () => {
     const file = fileInput.files?.[0];
     if (!file) return;
+    const revision = beginSourceChange();
     if (fileLabel) fileLabel.textContent = file.name;
     fileInput.value = ''; // allow selecting the same file again after a failure
     setStatus(`Opening ${file.name}…`);
@@ -403,6 +446,7 @@ function main(): void {
       try {
         g = await ensureGraph();
       } catch (error) {
+        if (!sourceSessions.isCurrent(revision)) return;
         stopAll();
         source = new SyntheticSource();
         setSourcePresentation('demo');
@@ -411,21 +455,29 @@ function main(): void {
         return;
       }
 
-      stopAll();
+      if (!sourceSessions.isCurrent(revision)) return;
       let primaryError: unknown;
-      try {
-        const buffer = await decodeAudioFile(g.ctx, file);
-        await startDecodedFile(g, buffer, file.name);
-        return;
-      } catch (error) {
-        primaryError = error;
-        console.warn('Decoded-buffer file path failed; trying browser media playback:', error);
+      if (!shouldUseMediaElement(file)) {
+        try {
+          const buffer = await decodeAudioFile(g.ctx, file);
+          if (!sourceSessions.isCurrent(revision)) return;
+          if (await startDecodedFile(g, buffer, file.name, revision)) return;
+          return;
+        } catch (error) {
+          if (!sourceSessions.isCurrent(revision)) return;
+          primaryError = error;
+          console.warn('Decoded-buffer file path failed; trying browser media playback:', error);
+        }
+      } else {
+        primaryError = new Error('Decoded-buffer path skipped for a large local file.');
+        setStatus(`${APP_NAME} — opening large file with the browser media player…`);
       }
 
       try {
         const fallback = await MediaFilePlayer.create(g, file);
-        await activatePlayer(g, fallback, `${file.name} · browser codec fallback`);
+        await activatePlayer(g, fallback, `${file.name} · browser codec fallback`, revision);
       } catch (fallbackError) {
+        if (!sourceSessions.isCurrent(revision)) return;
         stopAll();
         source = new SyntheticSource();
         setSourcePresentation('demo');
@@ -566,20 +618,23 @@ function main(): void {
   // --- test/automation hooks (dev builds only; stripped from production) ------
   if (import.meta.env.DEV) window.__vibrato = {
     loadDemo: () => {
-      stopAll();
+      beginSourceChange();
       source = new SyntheticSource();
       setSourcePresentation('demo');
     },
     loadUrl: (async (url: string) => {
+      const revision = beginSourceChange();
       const g = await ensureGraph();
+      if (!sourceSessions.isCurrent(revision)) return null;
       const buffer = await g.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
-      stopAll();
-      await startDecodedFile(g, buffer, url.split('/').pop() ?? 'file');
+      if (!sourceSessions.isCurrent(revision)) return null;
+      await startDecodedFile(g, buffer, url.split('/').pop() ?? 'file', revision);
       return { sampleRate: buffer.sampleRate, length: buffer.length, channels: buffer.numberOfChannels };
     }) as never,
     startOscTest: (async () => {
+      const revision = beginSourceChange();
       const g = await ensureGraph();
-      stopAll();
+      if (!sourceSessions.isCurrent(revision)) return;
       g.resumeAnalysis();
       oscHandle = startOscillator(g);
       liveBus = g.bus;
