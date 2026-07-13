@@ -3,6 +3,25 @@ import { expect, test } from '@playwright/test';
 
 const ORIGIN = 'http://127.0.0.1:4175';
 
+test('production preview sends the expected browser security headers', async ({ page }) => {
+  const response = await page.goto('/');
+  expect(response).not.toBeNull();
+  const headers = response!.headers();
+
+  expect(headers['cross-origin-opener-policy']).toBe('same-origin');
+  expect(headers['cross-origin-embedder-policy']).toBe('require-corp');
+  expect(headers['cross-origin-resource-policy']).toBe('same-origin');
+  expect(headers['x-content-type-options']).toBe('nosniff');
+  expect(headers['x-frame-options']).toBe('DENY');
+  expect(headers['referrer-policy']).toBe('no-referrer');
+  expect(headers['permissions-policy']).toContain('microphone=(self)');
+  expect(headers['permissions-policy']).toContain('display-capture=(self)');
+  expect(headers['content-security-policy']).toContain("script-src 'self'");
+  expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
+  expect(headers['content-security-policy']).not.toContain("script-src 'unsafe-inline'");
+  await expect(page.locator('html')).toHaveAttribute('data-theme', /^(light|dark)$/u);
+});
+
 for (const fixture of ['mono-sine.wav', 'mono-sine.mp3']) {
   test(`production bundle loads the AudioWorklet and opens ${fixture}`, async ({ page }) => {
     const pageErrors: string[] = [];

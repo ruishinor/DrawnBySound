@@ -391,6 +391,48 @@ test('external app cancellation is handled without a console error', async ({ pa
   expect(errors.filter((message) => message.includes('External app capture failed'))).toEqual([]);
 });
 
+test('stop invalidates a pending external capture request and closes the late stream', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.evaluate(() => {
+    const state = window as any;
+    state.__captureStopCount = 0;
+    state.__resolveCapture = null;
+
+    const track = {
+      addEventListener: () => undefined,
+      stop: () => {
+        state.__captureStopCount += 1;
+      },
+    };
+    const stream = {
+      getAudioTracks: () => [track],
+      getVideoTracks: () => [],
+      getTracks: () => [track],
+    };
+
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', {
+      configurable: true,
+      value: () =>
+        new Promise((resolve) => {
+          state.__resolveCapture = () => resolve(stream);
+        }),
+    });
+    AudioContext.prototype.createMediaStreamSource = () =>
+      ({ connect: () => undefined, disconnect: () => undefined }) as any;
+  });
+
+  await page.click('#system');
+  await expect(page.locator('#status')).toContainText('starting system-audio capture');
+  await page.click('#stop');
+  await expect(page.locator('#status')).toContainText('stopped · not listening');
+  await page.evaluate(() => (window as any).__resolveCapture());
+
+  await expect(page.locator('#status')).toContainText('stopped · not listening');
+  await expect.poll(() => page.evaluate(() => (window as any).__captureStopCount)).toBe(1);
+  await expect(page.locator('.source-button[aria-pressed="true"]')).toHaveCount(0);
+});
+
 test('unsupported mobile external capture stays visible with an honest explanation', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', {

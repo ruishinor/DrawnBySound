@@ -29,5 +29,6 @@ Thumbs.db
 .idea/
 
 # Local project artifacts
+.claude/
 .playwright-mcp/
 *.local.png

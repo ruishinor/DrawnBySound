@@ -65,4 +65,16 @@ describe('startMic', () => {
     await expect(startMic(graph)).rejects.toMatchObject({ name: 'NotAllowedError' });
     expect(getUserMedia).toHaveBeenCalledOnce();
   });
+
+  it('stops the granted stream if graph setup fails', async () => {
+    const getUserMedia = vi.fn();
+    const { graph, track, stream } = fixture(getUserMedia);
+    getUserMedia.mockResolvedValue(stream);
+    vi.mocked(graph.connectInput).mockImplementation(() => {
+      throw new Error('connect failed');
+    });
+
+    await expect(startMic(graph)).rejects.toThrow('connect failed');
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
 });

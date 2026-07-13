@@ -6,7 +6,7 @@ VibratoFlow captures or imports audio, extracts acoustic features locally, and r
 
 ## Current release state
 
-The audio/rendering core and the 2026-07-11 UI/persistence pass are implemented. The repository is a **release candidate**, not an unconditional production sign-off. Typecheck, unit tests, production build, AudioWorklet bundle verification, and the production-dependency audit pass. Browser E2E and exact-device acceptance remain required.
+The audio/rendering core and the 2026-07-11 UI/persistence pass are implemented. The repository is a **release candidate**, not an unconditional production sign-off. Typecheck, unit tests, production build, AudioWorklet/security-policy verification, and the full dependency audit pass. Browser E2E, live-deployment header checks, and exact-device acceptance remain required.
 
 Implemented:
 
@@ -36,6 +36,7 @@ The detailed decisions and remaining risks are in:
 - [Architecture](docs/architecture.md)
 - [Manual acceptance checklist](docs/MANUAL-ACCEPTANCE-2026-07-11.md)
 - [Earlier production-audio stabilization audit](docs/AUDIT-2026-07-11.md)
+- [Security hardening audit](docs/SECURITY-AUDIT-2026-07-13.md)
 
 ## Source behavior
 
@@ -70,8 +71,8 @@ if ($LASTEXITCODE -ne 0) { throw "STOP: unit tests failed." }
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "STOP: production build or worklet verification failed." }
 
-npm run audit:production
-if ($LASTEXITCODE -ne 0) { throw "STOP: production dependency audit failed." }
+npm run audit
+if ($LASTEXITCODE -ne 0) { throw "STOP: full dependency audit failed." }
 ```
 
 Install Playwright Chromium once, then run browser gates:
@@ -106,9 +107,9 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-Vite development/preview uses the same headers through `vite.config.ts`; Vercel uses `vercel.json`. The manifest link uses `crossorigin="use-credentials"` so Vercel-authenticated previews can fetch it with the deployment cookie. Vercel Toolbar injects cross-origin preview resources that do not opt into this policy; disable the Toolbar for this project or preview environment rather than weakening cross-origin isolation. Without cross-origin isolation, VibratoFlow degrades to preview-only with an explicit status.
+Vite development applies the isolation headers; production preview adds the browser security policy used by Vercel. `vercel.json` also defines CSP, Permissions-Policy, Referrer-Policy, HSTS, MIME-sniffing protection, clickjacking protection, and same-origin resource policy. `scripts/verify-security-config.mjs` rejects missing or weakened required controls during the build. The manifest link uses `crossorigin="use-credentials"` so Vercel-authenticated previews can fetch it with the deployment cookie. Vercel Toolbar injects cross-origin preview resources that do not opt into this policy; disable the Toolbar for this project or preview environment rather than weakening cross-origin isolation. Without cross-origin isolation, VibratoFlow degrades to preview-only with an explicit status.
 
-The production AudioWorklet is emitted as a separate JavaScript chunk and checked by `scripts/verify-dist.mjs`. File playback uses `decodeAudioData()` first and falls back to a local blob-backed media element for codec variants rejected by the decoder.
+The production AudioWorklet is emitted as a separate JavaScript chunk and checked by `scripts/verify-dist.mjs`. That verifier also rejects source maps, development hooks, Vite development clients, and inline scripts. File playback uses `decodeAudioData()` for ordinary files, routes files larger than 64 MiB directly to the local media-element path, and uses the same path as a codec fallback.
 
 ## Manual acceptance minimum
 
@@ -125,7 +126,7 @@ Before release, record exact browser, OS, and device versions for:
 ## Test status for this deliverable
 
 - Typecheck: pass.
-- Unit tests: pass — current total is verified by `npm test`.
-- Production build and AudioWorklet verifier: pass.
-- Production dependency audit: pass — zero production findings.
-- Playwright E2E: development and production-bundle suites pass on the verified baseline.
+- Unit tests: pass — 91 tests across 19 files on the 2026-07-13 hardening branch.
+- Production build, AudioWorklet verifier, artifact checks, and security-config verifier: pass.
+- Full and production-only dependency audits: pass — zero findings.
+- Playwright E2E suites are present but remain a release gate on an unrestricted browser host and the target device.
