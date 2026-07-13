@@ -1,4 +1,4 @@
-# VibratoFlow — other-app audio and live lyrics viability
+# Drawn by Sound — other-app audio and live lyrics viability
 
 Date: 2026-07-11
 
@@ -40,7 +40,7 @@ Required behavior:
 
 [Require an actual audio track] → verify: a video-only stream is rejected with guidance to choose a share target that includes audio.
 
-[Observe track termination] → verify: browser “Stop sharing” ends the VibratoFlow session and updates status.
+[Observe track termination] → verify: browser “Stop sharing” ends the Drawn by Sound session and updates status.
 
 [Keep local playback independent] → verify: capture does not intentionally mute the user’s selected source unless the browser/constraint does so.
 
@@ -48,7 +48,7 @@ Required behavior:
 
 ### 1.4 Mobile web viability
 
-**Not a dependable product promise.** Mobile browsers frequently lack a usable system/tab-audio option for `getDisplayMedia()`, and multi-window does not by itself grant a web page access to another app’s audio stream. Samsung’s audio-routing or isolation settings may change what the user hears, but VibratoFlow cannot depend on those private device controls from ordinary browser JavaScript.
+**Not a dependable product promise.** Mobile browsers frequently lack a usable system/tab-audio option for `getDisplayMedia()`, and multi-window does not by itself grant a web page access to another app’s audio stream. Samsung’s audio-routing or isolation settings may change what the user hears, but Drawn by Sound cannot depend on those private device controls from ordinary browser JavaScript.
 
 Recommended product behavior:
 
@@ -114,7 +114,7 @@ The feature needs these decisions first:
 
 #### Browser Whisper / Transformers.js approaches
 
-Projects such as Whisper Web demonstrate local browser inference using worker-based JavaScript runtimes, with experimental WebGPU acceleration. This is the closest architectural fit to VibratoFlow because it can remain local and can be isolated in a worker. The risks are model download size, first-run delay, memory use, compatibility, and pseudo-streaming rather than native token streaming.
+Projects such as Whisper Web demonstrate local browser inference using worker-based JavaScript runtimes, with experimental WebGPU acceleration. This is the closest architectural fit to Drawn by Sound because it can remain local and can be isolated in a worker. The risks are model download size, first-run delay, memory use, compatibility, and pseudo-streaming rather than native token streaming.
 
 Use only as an experimental branch after measuring:
 

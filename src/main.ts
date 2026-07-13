@@ -30,12 +30,14 @@ import {
   describePlaybackFailure,
 } from './core/capture/AudioErrors';
 import { SourceSessionCoordinator } from './app/SourceSessionCoordinator';
+import { ScreenWakeLockController } from './app/ScreenWakeLockController';
+import { VisualFullscreenController } from './app/VisualFullscreenController';
 
 const WINDOW = 2048;
 
 declare global {
   interface Window {
-    __vibrato?: Record<string, (...args: never[]) => unknown>;
+    __drawnBySound?: Record<string, (...args: never[]) => unknown>;
   }
 }
 
@@ -88,7 +90,18 @@ function main(): void {
     const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     if (themeColor) themeColor.content = resolved === 'dark' ? '#1b1d1f' : '#dfe1df';
   };
-  applyAppearance();
+  const wakeLock = new ScreenWakeLockController(({ state, error }) => {
+    document.documentElement.dataset.screenWakeLock = state;
+    if (state === 'error') {
+      setStatus(`${APP_NAME} — the browser could not keep the screen awake`);
+      console.warn('Screen wake lock request failed:', error);
+    }
+  });
+  const applyPreferences = (): void => {
+    applyAppearance();
+    void wakeLock.setEnabled(store.get().keepScreenAwake);
+  };
+  applyPreferences();
   systemTheme.addEventListener('change', () => {
     if (store.get().appearance === 'system') applyAppearance();
   });
@@ -269,7 +282,7 @@ function main(): void {
   const panelEl = document.getElementById('panel');
   const settingsButton = document.getElementById('settings-btn');
   const panel = panelEl
-    ? new SettingsPanel(panelEl, store, applyAppearance, (open) => {
+    ? new SettingsPanel(panelEl, store, applyPreferences, (open) => {
         settingsButton?.setAttribute('aria-expanded', String(open));
       })
     : null;
@@ -528,6 +541,14 @@ function main(): void {
   window.addEventListener('resize', resize);
   resize();
 
+  const stage = document.getElementById('stage');
+  const fullscreenButton = document.getElementById('fullscreen-toggle');
+  const viewModeStatus = document.getElementById('view-mode-status');
+  const fullscreenController =
+    stage instanceof HTMLElement && fullscreenButton instanceof HTMLButtonElement
+      ? new VisualFullscreenController(stage, fullscreenButton, viewModeStatus, resize)
+      : null;
+
   const applyDemoFrame = (t: number): void => {
     featureFrame.rms = 0.45;
     featureFrame.centroid = 0.5 + 0.25 * Math.sin(t * 0.2);
@@ -616,7 +637,7 @@ function main(): void {
   requestAnimationFrame(frame);
 
   // --- test/automation hooks (dev builds only; stripped from production) ------
-  if (import.meta.env.DEV) window.__vibrato = {
+  if (import.meta.env.DEV) window.__drawnBySound = {
     loadDemo: () => {
       beginSourceChange();
       source = new SyntheticSource();
@@ -645,6 +666,8 @@ function main(): void {
     }) as never,
     setGain: ((g: number) => store.update({ inputGain: g })) as never,
     capabilities: (() => detectCapabilities()) as never,
+    viewMode: (() => fullscreenController?.currentMode ?? 'inline') as never,
+    wakeLockState: (() => document.documentElement.dataset.screenWakeLock ?? 'unknown') as never,
     startSystem: (async () => startSystemMode()) as never,
     setSetting: ((key: string, value: unknown) => store.update({ [key]: value } as never)) as never,
     play: (() => player?.play()) as never,

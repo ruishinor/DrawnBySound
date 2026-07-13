@@ -16,14 +16,14 @@ for (const name of jsFiles) {
   if (text.includes('data:video/mp2t')) {
     throw new Error(`${name} contains an invalid TypeScript data URL for the AudioWorklet.`);
   }
-  for (const forbidden of ['__vibrato', '/@vite/client', '@react-refresh', 'sourceMappingURL=']) {
+  for (const forbidden of ['__drawnBySound', '/@vite/client', '@react-refresh', 'sourceMappingURL=']) {
     if (text.includes(forbidden)) throw new Error(`${name} contains production-forbidden marker: ${forbidden}.`);
   }
 }
 
 const workletText = await readFile(path.join(assets, worklets[0]), 'utf8');
-if (!/registerProcessor\(["'`]vibrato-preprocessor["'`]/u.test(workletText)) {
-  throw new Error('Bundled AudioWorklet does not register vibrato-preprocessor.');
+if (!/registerProcessor\(["'`]drawn-by-sound-preprocessor["'`]/u.test(workletText)) {
+  throw new Error('Bundled AudioWorklet does not register drawn-by-sound-preprocessor.');
 }
 
 const rootNames = await readdir(dist);

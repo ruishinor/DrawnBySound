@@ -1,4 +1,4 @@
-# VibratoFlow security hardening audit — 2026-07-13
+# Drawn by Sound security hardening audit — 2026-07-13
 
 Audit basis: repository commit `b6bf24020a8b9b8d548cff6c9b3bf4f2644218c9`, reviewed and patched on local branch `security/hardening-2026-07-13`.
 
@@ -147,7 +147,7 @@ No suspected critical user-data, money, admin, tenant-isolation, authentication,
 | `npm run audit` | Pass: zero vulnerabilities. |
 | `npm run audit:production` | Pass: zero vulnerabilities. |
 | Local `vite preview` plus `curl -I` | Pass for CSP, COOP, COEP, CORP, Permissions-Policy, Referrer-Policy, `nosniff`, frame denial, and cross-domain-policy restriction on HTML and `theme-init.js`. HSTS intentionally not claimed from local HTTP. |
-| Repository sink/network scan with `rg` | No `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `eval`, `new Function`, XHR, WebSocket, EventSource, or production remote endpoint found. The only `fetch` is inside the development-only `window.__vibrato` hook and the build verifier rejects that marker in `dist`. |
+| Repository sink/network scan with `rg` | No `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `eval`, `new Function`, XHR, WebSocket, EventSource, or production remote endpoint found. The only `fetch` is inside the development-only `window.__drawnBySound` hook and the build verifier rejects that marker in `dist`. |
 | Production artifact scan | No `.map`, source-map marker, Vite client, React-refresh marker, development hook, or remote URL except the SVG namespace. |
 | Current tree/history credential-pattern scan | Zero credential-pattern Git blobs; no `.env`, key, certificate bundle, or named secret file found. |
 | `git diff --check` | Pass. |
@@ -155,6 +155,8 @@ No suspected critical user-data, money, admin, tenant-isolation, authentication,
 | Playwright E2E execution | Not completed. Playwright Chromium download failed with DNS `EAI_AGAIN`; the system Chromium is enterprise-policy restricted and blocks local URLs/capture. Tests were added but must run elsewhere. |
 
 ## 6. Residual risks
+
+- Screen Wake Lock and element fullscreen are progressive browser capabilities. The implementation is opt-in, releases or falls back safely, and does not treat availability as guaranteed.
 
 - Browser E2E and exact-device microphone/display/file tests are not verified on this machine.
 - Live Vercel behavior, including HSTS and whether every asset receives the intended headers, is not verified until a deployment URL is checked.

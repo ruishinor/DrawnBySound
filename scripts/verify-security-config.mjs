@@ -42,7 +42,14 @@ if (csp.includes("'unsafe-eval'") || /script-src[^;]*'unsafe-inline'/u.test(csp)
 }
 
 const permissions = headers.get('permissions-policy') ?? '';
-for (const policy of ['microphone=(self)', 'display-capture=(self)', 'camera=()', 'geolocation=()']) {
+for (const policy of [
+  'microphone=(self)',
+  'display-capture=(self)',
+  'fullscreen=(self)',
+  'screen-wake-lock=(self)',
+  'camera=()',
+  'geolocation=()',
+]) {
   if (!permissions.includes(policy)) throw new Error(`Permissions-Policy is missing: ${policy}.`);
 }
 

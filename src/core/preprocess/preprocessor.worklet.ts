@@ -119,4 +119,4 @@ class PreprocessorProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('vibrato-preprocessor', PreprocessorProcessor);
+registerProcessor('drawn-by-sound-preprocessor', PreprocessorProcessor);

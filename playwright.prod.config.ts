@@ -1,6 +1,8 @@
+import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const fakeMicrophoneAudio = path.resolve('test-assets', 'mono-sine.wav').replaceAll('\\', '/');
 
 export default defineConfig({
   testDir: 'tests/e2e-prod',
@@ -10,7 +12,11 @@ export default defineConfig({
     viewport: { width: 390, height: 844 },
     launchOptions: {
       ...(executablePath ? { executablePath } : {}),
-      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+      args: [
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+        `--use-file-for-fake-audio-capture=${fakeMicrophoneAudio}`,
+      ],
     },
   },
   webServer: {

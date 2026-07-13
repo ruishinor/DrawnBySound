@@ -7,7 +7,8 @@ import {
   type VisualPresetSettings,
 } from './presets';
 
-export const CUSTOM_PRESETS_STORAGE_KEY = 'vibratoflow.customPresets.v1';
+export const CUSTOM_PRESETS_STORAGE_KEY = 'drawn-by-sound.customPresets.v1';
+const LEGACY_CUSTOM_PRESETS_STORAGE_KEY = 'vibratoflow.customPresets.v1';
 const MAX_NAME_LENGTH = 40;
 const ID_PATTERN = /^[a-z0-9-]{1,100}$/iu;
 
@@ -114,7 +115,9 @@ export class CustomPresetStore {
 
   private load(): CustomPreset[] {
     try {
-      const stored = globalThis.localStorage?.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+      const current = globalThis.localStorage?.getItem(CUSTOM_PRESETS_STORAGE_KEY);
+      const legacy = current ? null : globalThis.localStorage?.getItem(LEGACY_CUSTOM_PRESETS_STORAGE_KEY);
+      const stored = current ?? legacy;
       if (!stored) return [];
       const parsed = JSON.parse(stored) as unknown;
       if (!Array.isArray(parsed)) return [];
@@ -132,6 +135,9 @@ export class CustomPresetStore {
         names.add(foldedName);
         ids.add(preset.id);
         result.push(preset);
+      }
+      if (!current && legacy) {
+        globalThis.localStorage?.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(result));
       }
       return result;
     } catch {

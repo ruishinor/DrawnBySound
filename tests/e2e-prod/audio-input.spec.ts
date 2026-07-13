@@ -16,6 +16,8 @@ test('production preview sends the expected browser security headers', async ({ 
   expect(headers['referrer-policy']).toBe('no-referrer');
   expect(headers['permissions-policy']).toContain('microphone=(self)');
   expect(headers['permissions-policy']).toContain('display-capture=(self)');
+  expect(headers['permissions-policy']).toContain('fullscreen=(self)');
+  expect(headers['permissions-policy']).toContain('screen-wake-lock=(self)');
   expect(headers['content-security-policy']).toContain("script-src 'self'");
   expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
   expect(headers['content-security-policy']).not.toContain("script-src 'unsafe-inline'");
@@ -54,7 +56,7 @@ for (const fixture of ['mono-sine.wav', 'mono-sine.mp3']) {
   });
 }
 
-test('production bundle starts the microphone path', async ({ context, page }) => {
+test('production bundle receives a non-zero microphone signal', async ({ context, page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await context.grantPermissions(['microphone'], { origin: ORIGIN });
@@ -62,6 +64,7 @@ test('production bundle starts the microphone path', async ({ context, page }) =
   await page.goto('/');
   await expect(page.locator('#mic')).toBeEnabled();
   await page.locator('#mic').click();
-  await expect(page.locator('#status')).toContainText('listening', { timeout: 15_000 });
+  await expect(page.locator('#status')).toContainText(/gain|clipping/u, { timeout: 15_000 });
+  await expect(page.locator('#status')).not.toContainText('no signal');
   expect(pageErrors).toEqual([]);
 });

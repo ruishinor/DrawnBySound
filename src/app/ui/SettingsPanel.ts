@@ -11,7 +11,7 @@ import { MODES } from '../../core/render/modes';
 
 function controlId(label: string): string {
   const slug = label.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/(^-|-$)/gu, '');
-  return `vf-${slug}`;
+  return `dbs-${slug}`;
 }
 
 const CUSTOM_PRESET_DESCRIPTION =
@@ -19,7 +19,14 @@ const CUSTOM_PRESET_DESCRIPTION =
 const SAVED_PRESET_DESCRIPTION =
   'Saved for this site address on this device. Editing a visual control creates unsaved Custom settings without changing the saved preset.';
 const CUSTOM_PRESET_PREFIX = 'custom:';
-const LAST_SELECTED_PRESET_STORAGE_KEY = 'vibratoflow.lastSelectedPreset.v1';
+const LAST_SELECTED_PRESET_STORAGE_KEY = 'drawn-by-sound.lastSelectedPreset.v1';
+const LEGACY_LAST_SELECTED_PRESET_STORAGE_KEY = 'vibratoflow.lastSelectedPreset.v1';
+
+function screenWakeLockSupported(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const candidate = navigator as Navigator & { wakeLock?: { request?: unknown } };
+  return typeof candidate.wakeLock?.request === 'function';
+}
 
 interface LastSelectedPreset {
   value: string;
@@ -147,7 +154,9 @@ export class SettingsPanel {
 
   private loadLastSelectedPreset(): LastSelectedPreset | null {
     try {
-      const stored = globalThis.localStorage?.getItem(LAST_SELECTED_PRESET_STORAGE_KEY);
+      const current = globalThis.localStorage?.getItem(LAST_SELECTED_PRESET_STORAGE_KEY);
+      const legacy = current ? null : globalThis.localStorage?.getItem(LEGACY_LAST_SELECTED_PRESET_STORAGE_KEY);
+      const stored = current ?? legacy;
       if (!stored) return null;
       const parsed = JSON.parse(stored) as unknown;
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
@@ -156,7 +165,11 @@ export class SettingsPanel {
       if (typeof record.label !== 'string') return null;
       const label = record.label.trim();
       if (!label || label.length > 80) return null;
-      return { value: record.value, label };
+      const result = { value: record.value, label };
+      if (!current && legacy) {
+        globalThis.localStorage?.setItem(LAST_SELECTED_PRESET_STORAGE_KEY, JSON.stringify(result));
+      }
+      return result;
     } catch {
       return null;
     }
@@ -214,7 +227,7 @@ export class SettingsPanel {
 
     if (value === '' && this.lastSelectedPreset) {
       const lastSelected = document.createElement('p');
-      lastSelected.id = 'vf-last-selected-preset';
+      lastSelected.id = 'dbs-last-selected-preset';
       lastSelected.className = 'preset-last-selected';
       lastSelected.append('Last selected preset: ');
       const name = document.createElement('strong');
@@ -225,7 +238,7 @@ export class SettingsPanel {
 
     const saved = this.customPresets.getAll();
     const savedArea = document.createElement('div');
-    savedArea.id = 'vf-saved-presets';
+    savedArea.id = 'dbs-saved-presets';
     savedArea.className = 'saved-presets';
 
     const header = document.createElement('div');
@@ -265,8 +278,8 @@ export class SettingsPanel {
   }
 
   private syncPresetActions(value: string): void {
-    const save = this.el.querySelector<HTMLButtonElement>('#vf-save-current-preset');
-    const remove = this.el.querySelector<HTMLButtonElement>('#vf-delete-saved-preset');
+    const save = this.el.querySelector<HTMLButtonElement>('#dbs-save-current-preset');
+    const remove = this.el.querySelector<HTMLButtonElement>('#dbs-delete-saved-preset');
     if (save) {
       save.disabled = value !== '';
       save.title = save.disabled
@@ -294,7 +307,7 @@ export class SettingsPanel {
     actions.className = 'preset-actions';
 
     const save = document.createElement('button');
-    save.id = 'vf-save-current-preset';
+    save.id = 'dbs-save-current-preset';
     save.type = 'button';
     save.textContent = 'Save current preset';
     save.disabled = this.presetValue() !== '';
@@ -319,7 +332,7 @@ export class SettingsPanel {
     });
 
     const remove = document.createElement('button');
-    remove.id = 'vf-delete-saved-preset';
+    remove.id = 'dbs-delete-saved-preset';
     remove.className = 'preset-delete';
     remove.type = 'button';
     remove.textContent = 'Delete saved preset';
@@ -447,6 +460,7 @@ export class SettingsPanel {
     value: boolean,
     onSet: (value: boolean) => void,
     description?: string,
+    disabled = false,
   ): HTMLElement {
     const row = document.createElement('div');
     row.className = 'toggle-row';
@@ -457,6 +471,7 @@ export class SettingsPanel {
     input.name = id;
     input.type = 'checkbox';
     input.checked = value;
+    input.disabled = disabled;
     if (copy.description) input.setAttribute('aria-describedby', copy.description.id);
     input.addEventListener('change', () => onSet(input.checked));
     row.append(copy.wrapper, input);
@@ -543,12 +558,20 @@ export class SettingsPanel {
         'The browser, operating system, selected share surface, and source app must all allow audio sharing.',
       ],
       [
+        'Why does Microphone say no signal?',
+        'First test without screen recording, calls, voice recorders, assistants, or another app using the microphone. On many phones, a second app can take priority while the browser stays open but receives silence. Also check the phone-wide microphone toggle, browser permission, Bluetooth input routing, and whether the page is open directly in the browser rather than an in-app view. For screen recording, use device audio only or record the visual without the recorder microphone.',
+      ],
+      [
+        'How do I keep my phone screen awake?',
+        'Enable Keep screen awake under Device and accessibility. It requests a screen wake lock while this page is visible. If the control is unavailable or the browser releases it, increase Auto-Lock on iPhone under Settings → Display & Brightness, or Screen timeout on Android under Settings → Display. Names vary by device.',
+      ],
+      [
         'Does audio leave this device?',
         'No. Analysis and visual rendering run locally in the browser.',
       ],
       [
         'What is remembered?',
-        'Visual preferences, interface choices, and your preferred source are stored locally. Protected sources and files are never restarted automatically.',
+        'Visual preferences, interface choices, screen-awake preference, and your preferred source are stored locally. Protected sources and files are never restarted automatically.',
       ],
     ];
 
@@ -797,6 +820,18 @@ export class SettingsPanel {
         'Shows a technical overlay with frame rate, signal level, gain, clipping, frequency, and classifier data.',
       ),
     );
+    const wakeLockAvailable = screenWakeLockSupported();
+    accessibility.appendChild(
+      this.checkbox(
+        'Keep screen awake',
+        settings.keepScreenAwake,
+        (value) => this.set('keepScreenAwake', value),
+        wakeLockAvailable
+          ? 'Requests that this screen stay on while the page is visible. The browser or operating system may still release it, and it uses more battery.'
+          : 'This browser cannot keep the screen awake from a web page. Use the phone’s Auto-Lock or Screen timeout setting instead.',
+        !wakeLockAvailable,
+      ),
+    );
     this.el.appendChild(accessibility);
 
     const actions = document.createElement('section');
@@ -807,7 +842,7 @@ export class SettingsPanel {
     reset.textContent = 'Restore all visual defaults';
     reset.addEventListener('click', () => {
       const confirmed = globalThis.confirm(
-        'Restore all visual settings to their defaults? Interface, source, and saved presets will be kept.',
+        'Restore all visual settings to their defaults? Interface, source, screen-awake preference, and saved presets will be kept.',
       );
       if (!confirmed) return;
       this.store.reset();

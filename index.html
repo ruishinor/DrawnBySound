@@ -3,21 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>VibratoFlow</title>
+    <title>Drawn by Sound</title>
     <meta name="description" content="A private, real-time music visualizer for microphone, files, and supported shared audio." />
     <meta name="theme-color" content="#dfe1df" />
     <script src="/theme-init.js"></script>
-    <link rel="icon" type="image/svg+xml" href="/Flow-favicon.svg" />
-    <link rel="apple-touch-icon" href="/Flow-apple-touch-icon.png" />
-    <link rel="manifest" href="/Flow-site.webmanifest" crossorigin="use-credentials" />
+    <link rel="icon" type="image/svg+xml" href="/drawn-by-sound-favicon.svg" />
+    <link rel="apple-touch-icon" href="/drawn-by-sound-apple-touch-icon.png" />
+    <link rel="manifest" href="/drawn-by-sound.webmanifest" crossorigin="use-credentials" />
   </head>
   <body>
     <div id="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="VibratoFlow home">
+        <a class="brand" href="/" aria-label="Drawn by Sound home">
           <span class="brand-mark" aria-hidden="true"></span>
           <span>
-            <strong>VibratoFlow</strong>
+            <strong>Drawn by Sound</strong>
             <small>Music, drawn live</small>
           </span>
         </a>
@@ -41,12 +41,28 @@
           <span id="source-kicker">Demo</span>
           <strong id="source-title">Sample signal</strong>
         </div>
+        <button
+          id="fullscreen-toggle"
+          class="stage-action fullscreen-toggle"
+          type="button"
+          aria-label="Enter full screen"
+          aria-pressed="false"
+          title="Enter full screen"
+        >
+          <svg class="fullscreen-icon fullscreen-icon--enter" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+          </svg>
+          <svg class="fullscreen-icon fullscreen-icon--exit" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+          </svg>
+        </button>
+        <span id="view-mode-status" class="visually-hidden" role="status" aria-live="polite"></span>
       </main>
 
       <section id="control-deck" class="control-deck" aria-label="Audio source controls">
         <div class="session-row">
           <div class="session-copy">
-            <p id="status" role="status" aria-live="polite">Loading VibratoFlow…</p>
+            <p id="status" role="status" aria-live="polite">Loading Drawn by Sound…</p>
             <p id="capability-note">
               Audio stays on this device. External app capture depends on browser, operating system, and the source app.
             </p>
@@ -63,7 +79,7 @@
           <span id="time">0:00 / 0:00</span>
         </div>
 
-        <div class="source-controls" role="group" aria-label="Choose what VibratoFlow listens to">
+        <div class="source-controls" role="group" aria-label="Choose what Drawn by Sound listens to">
           <button id="mic" class="source-button" type="button" aria-pressed="false">
             <span>Microphone</span>
             <small>Room or speaker</small>

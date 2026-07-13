@@ -24,6 +24,7 @@ export interface Settings {
   lowPower: boolean;
   reducedMotion: boolean;
   showDebug: boolean;
+  keepScreenAwake: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -47,10 +48,12 @@ export const DEFAULT_SETTINGS: Settings = {
   lowPower: false,
   reducedMotion: false,
   showDebug: false,
+  keepScreenAwake: false,
 };
 
-export const SETTINGS_STORAGE_KEY = 'vibratoflow.settings.v3';
-const PREVIOUS_KEY = 'vibratoflow.settings.v2';
+export const SETTINGS_STORAGE_KEY = 'drawn-by-sound.settings.v1';
+const PREVIOUS_BRAND_KEY = 'vibratoflow.settings.v3';
+const RETIRED_THEME_KEY = 'vibratoflow.settings.v2';
 const LEGACY_KEY = 'vibratoflow.settings.v1';
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu;
 const SOURCE_VALUES = new Set<SourcePreference>(['demo', 'mic', 'system', 'file']);
@@ -124,7 +127,14 @@ export function sanitizeSettings(value: unknown): Partial<Settings> {
   if (typeof value.customInterfaceAccent === 'string' && HEX_COLOR.test(value.customInterfaceAccent)) {
     result.customInterfaceAccent = value.customInterfaceAccent.toLowerCase();
   }
-  for (const key of ['useCustomColor', 'useCustomInterfaceAccent', 'lowPower', 'reducedMotion', 'showDebug'] as const) {
+  for (const key of [
+    'useCustomColor',
+    'useCustomInterfaceAccent',
+    'lowPower',
+    'reducedMotion',
+    'showDebug',
+    'keepScreenAwake',
+  ] as const) {
     if (typeof value[key] === 'boolean') result[key] = value[key];
   }
   return result;
@@ -163,7 +173,7 @@ export class SettingsStore {
     return this.settings;
   }
 
-  /** Reset visual tuning while preserving interface and source preferences. */
+  /** Reset visual tuning while preserving interface, source, and device preferences. */
   reset(): Readonly<Settings> {
     const {
       preferredSource,
@@ -171,6 +181,7 @@ export class SettingsStore {
       interfaceAccent,
       customInterfaceAccent,
       useCustomInterfaceAccent,
+      keepScreenAwake,
     } = this.settings;
     this.settings = {
       ...DEFAULT_SETTINGS,
@@ -179,6 +190,7 @@ export class SettingsStore {
       interfaceAccent,
       customInterfaceAccent,
       useCustomInterfaceAccent,
+      keepScreenAwake,
     };
     this.save();
     return this.settings;
@@ -189,9 +201,16 @@ export class SettingsStore {
       const current = globalThis.localStorage?.getItem(SETTINGS_STORAGE_KEY);
       if (current) return sanitizeSettings(JSON.parse(current));
 
-      const previous = globalThis.localStorage?.getItem(PREVIOUS_KEY);
-      if (previous) {
-        const parsed = JSON.parse(previous) as unknown;
+      const previousBrand = globalThis.localStorage?.getItem(PREVIOUS_BRAND_KEY);
+      if (previousBrand) {
+        const migrated = sanitizeSettings(JSON.parse(previousBrand));
+        globalThis.localStorage?.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...migrated }));
+        return migrated;
+      }
+
+      const retiredTheme = globalThis.localStorage?.getItem(RETIRED_THEME_KEY);
+      if (retiredTheme) {
+        const parsed = JSON.parse(retiredTheme) as unknown;
         const migrated = sanitizeSettings(parsed);
         if (usesRetiredThemeDefaults(parsed)) {
           migrated.palette = DEFAULT_SETTINGS.palette;

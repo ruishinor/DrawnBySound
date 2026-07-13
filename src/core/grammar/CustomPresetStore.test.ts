@@ -80,6 +80,19 @@ describe('CustomPresetStore', () => {
     });
   });
 
+  it('migrates presets from the previous product-name storage key', () => {
+    const settings = { ...DEFAULT_SETTINGS, persistence: 0.94 };
+    localStorage.setItem(
+      'vibratoflow.customPresets.v1',
+      JSON.stringify([{ id: 'legacy-preset', name: 'Legacy preset', settings }]),
+    );
+
+    const restored = new CustomPresetStore().getAll();
+    expect(restored).toHaveLength(1);
+    expect(restored[0]).toMatchObject({ id: 'legacy-preset', name: 'Legacy preset' });
+    expect(localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY)).not.toBeNull();
+  });
+
   it('rejects duplicate names, duplicate snapshots, and unchanged built-in presets', () => {
     const store = new CustomPresetStore();
     const custom = { ...DEFAULT_SETTINGS, persistence: 0.94 };

@@ -1,22 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * Smoke E2E for the VibratoFlow web MVP. Runs against the dev server (the
- * `window.__vibrato` automation hooks are dev-only). Fixtures come from
+ * Smoke E2E for the Drawn by Sound web MVP. Runs against the dev server (the
+ * `window.__drawnBySound` automation hooks are dev-only). Fixtures come from
  * `node scripts/gen-test-assets.mjs`.
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const hooks = (page: Page) => page.waitForFunction(() => !!(window as any).__vibrato);
+const hooks = (page: Page) => page.waitForFunction(() => !!(window as any).__drawnBySound);
 
 test('boots cross-origin isolated with a live sample source', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
 
-  await expect(page.locator('#status')).toContainText('VibratoFlow — sample signal');
+  await expect(page.locator('#status')).toContainText('Drawn by Sound — sample signal');
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 
-  const probe = await page.evaluate(() => (window as any).__vibrato.probe());
+  const probe = await page.evaluate(() => (window as any).__drawnBySound.probe());
   expect(probe.ok).toBe(true);
   expect(probe.max).toBeGreaterThan(0.5);
 });
@@ -33,6 +33,85 @@ test('primary controls use the accepted labels and source order', async ({ page 
     'Audio file',
     'Demo',
   ]);
+});
+
+test('brand metadata and stage fullscreen control use the Drawn by Sound identity', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+
+  await expect(page).toHaveTitle('Drawn by Sound');
+  await expect(page.locator('.brand strong')).toHaveText('Drawn by Sound');
+  await expect(page.locator('#fullscreen-toggle')).toHaveAttribute('aria-label', 'Enter full screen');
+});
+
+test('fullscreen control falls back to an accessible expanded view and exits with Escape', async ({ page }) => {
+  await page.goto('/');
+  await hooks(page);
+  await page.evaluate(() => {
+    Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: undefined,
+    });
+  });
+
+  await page.locator('#fullscreen-toggle').click();
+  await expect(page.locator('#stage')).toHaveClass(/stage--expanded/u);
+  await expect(page.locator('#fullscreen-toggle')).toHaveAttribute('aria-label', 'Exit expanded view');
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__drawnBySound.viewMode()))
+    .toBe('expanded-view');
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#stage')).not.toHaveClass(/stage--expanded/u);
+  await expect(page.locator('#fullscreen-toggle')).toHaveAttribute('aria-label', 'Enter full screen');
+});
+
+test('screen wake lock can be enabled and is restored from local settings', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__wakeLockRequests = 0;
+    const sentinel = new EventTarget() as EventTarget & {
+      released: boolean;
+      release: () => Promise<void>;
+    };
+    sentinel.released = false;
+    sentinel.release = async () => {
+      if (sentinel.released) return;
+      sentinel.released = true;
+      sentinel.dispatchEvent(new Event('release'));
+    };
+    Object.defineProperty(navigator, 'wakeLock', {
+      configurable: true,
+      value: {
+        request: async (type: string) => {
+          if (type !== 'screen') throw new Error('Unexpected wake lock type.');
+          (window as any).__wakeLockRequests += 1;
+          sentinel.released = false;
+          return sentinel;
+        },
+      },
+    });
+  });
+
+  await page.goto('/');
+  await hooks(page);
+  await page.click('#settings-btn');
+  const toggle = page.getByLabel('Keep screen awake');
+  await expect(toggle).toBeEnabled();
+  await toggle.check();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__wakeLockRequests))
+    .toBe(1);
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__drawnBySound.wakeLockState()))
+    .toBe('active');
+
+  await page.reload();
+  await hooks(page);
+  await page.click('#settings-btn');
+  await expect(page.getByLabel('Keep screen awake')).toBeChecked();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).__drawnBySound.wakeLockState()))
+    .toBe('active');
 });
 
 test('Norwegian palettes are selectable without changing the selected rendering mode', async ({ page }) => {
@@ -52,38 +131,38 @@ test('Norwegian palettes are selectable without changing the selected rendering 
   await expect(palette.locator('option:checked')).toHaveText('Norwegian flag');
   await expect(mode).toHaveValue(initialMode);
   await expect
-    .poll(() => page.evaluate(() => (window as any).__vibrato.averageLuminance()))
+    .poll(() => page.evaluate(() => (window as any).__drawnBySound.averageLuminance()))
     .toBeGreaterThan(0);
 });
 
 test('file pipeline drives all five rendering modes', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
-  await page.evaluate(() => (window as any).__vibrato.loadUrl('/test-assets/stereo-lissajous.wav'));
+  await page.evaluate(() => (window as any).__drawnBySound.loadUrl('/test-assets/stereo-lissajous.wav'));
   for (const id of ['stereo-xy', 'mono-phase-xy', 'band-xy', 'beat-lissajous', 'hybrid-grammar']) {
-    await page.evaluate((m) => (window as any).__vibrato.setModeById(m), id);
+    await page.evaluate((m) => (window as any).__drawnBySound.setModeById(m), id);
     await page.waitForTimeout(350);
-    expect(await page.evaluate(() => (window as any).__vibrato.averageLuminance())).toBeGreaterThan(0);
+    expect(await page.evaluate(() => (window as any).__drawnBySound.averageLuminance())).toBeGreaterThan(0);
   }
 });
 
 test('stop control halts listening and the trace decays', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
-  await page.evaluate(() => (window as any).__vibrato.loadUrl('/test-assets/mono-sine.wav'));
+  await page.evaluate(() => (window as any).__drawnBySound.loadUrl('/test-assets/mono-sine.wav'));
   await page.waitForTimeout(400);
   await page.click('#stop');
   await expect(page.locator('#status')).toContainText('not listening');
-  const l1 = await page.evaluate(() => (window as any).__vibrato.averageLuminance());
+  const l1 = await page.evaluate(() => (window as any).__drawnBySound.averageLuminance());
   await page.waitForTimeout(600);
-  const l2 = await page.evaluate(() => (window as any).__vibrato.averageLuminance());
+  const l2 = await page.evaluate(() => (window as any).__drawnBySound.averageLuminance());
   expect(l2).toBeLessThan(l1);
 });
 
 test('still export produces a PNG without interrupting the session', async ({ page }) => {
   await page.goto('/');
   await hooks(page);
-  const size = await page.evaluate(() => (window as any).__vibrato.exportPng());
+  const size = await page.evaluate(() => (window as any).__drawnBySound.exportPng());
   expect(size).toBeGreaterThan(1000);
 });
 
@@ -94,7 +173,7 @@ test('local-first: no request ever leaves the origin', async ({ page }) => {
   });
   await page.goto('/');
   await hooks(page);
-  await page.evaluate(() => (window as any).__vibrato.loadUrl('/test-assets/stereo-lissajous.wav'));
+  await page.evaluate(() => (window as any).__drawnBySound.loadUrl('/test-assets/stereo-lissajous.wav'));
   await page.waitForTimeout(800);
   expect(foreign).toEqual([]);
 });
@@ -147,12 +226,12 @@ test('settings explain controls and keep the active preset visible', async ({ pa
 
   const preset = page.getByLabel('Preset');
   await expect(preset.locator('option:checked')).toHaveText('Custom settings');
-  await expect(page.locator('#vf-input-gain-description')).toContainText('Playback volume is unchanged');
-  await expect(page.locator('#vf-custom-colour-description')).toContainText('visual trace only');
-  await expect(page.locator('#vf-shape-description')).toContainText('left channel horizontally');
-  await expect(page.locator('#vf-use-less-power-description')).toContainText('lower resolution');
-  await expect(page.locator('#vf-reduce-motion-description')).toContainText('sudden bursts');
-  await expect(page.locator('#vf-show-diagnostics-description')).toContainText('frame rate');
+  await expect(page.locator('#dbs-input-gain-description')).toContainText('Playback volume is unchanged');
+  await expect(page.locator('#dbs-custom-colour-description')).toContainText('visual trace only');
+  await expect(page.locator('#dbs-shape-description')).toContainText('left channel horizontally');
+  await expect(page.locator('#dbs-use-less-power-description')).toContainText('lower resolution');
+  await expect(page.locator('#dbs-reduce-motion-description')).toContainText('sudden bursts');
+  await expect(page.locator('#dbs-show-diagnostics-description')).toContainText('frame rate');
 
   await preset.focus();
   await preset.press('ArrowDown');
@@ -165,7 +244,7 @@ test('settings explain controls and keep the active preset visible', async ({ pa
   await preset.selectOption('deep-bass-field');
   await expect(page.getByLabel('Preset')).toHaveValue('deep-bass-field');
   await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Deep Bass Field');
-  await expect(page.locator('#vf-preset-description')).toContainText('low frequencies');
+  await expect(page.locator('#dbs-preset-description')).toContainText('low frequencies');
 
   await page.reload();
   await hooks(page);
@@ -200,7 +279,7 @@ test('custom presets preserve the edited snapshot without mutating the saved def
   });
 
   await expect(preset.locator('option:checked')).toHaveText('Custom settings');
-  await expect(page.locator('#vf-last-selected-preset')).toContainText('Deep Bass Field');
+  await expect(page.locator('#dbs-last-selected-preset')).toContainText('Deep Bass Field');
   await expect(page.getByLabel('Shape')).toHaveValue('stereo-xy');
   await expect(page.getByLabel('Colour set')).toHaveValue('ice');
   await expect(page.getByLabel('Trail length')).toHaveValue('0.96');
@@ -209,8 +288,8 @@ test('custom presets preserve the edited snapshot without mutating the saved def
   page.once('dialog', (dialog) => void dialog.accept('Night bass'));
   await page.getByRole('button', { name: 'Save current preset' }).click();
   await expect(preset.locator('option:checked')).toHaveText('Night bass');
-  await expect(page.locator('#vf-preset-description')).toContainText('without changing the saved preset');
-  await expect(page.locator('#vf-saved-presets')).toContainText('Night bass');
+  await expect(page.locator('#dbs-preset-description')).toContainText('without changing the saved preset');
+  await expect(page.locator('#dbs-saved-presets')).toContainText('Night bass');
   await expect(page.getByRole('button', { name: 'Load saved preset Night bass' })).toBeVisible();
 
   await page.reload();
@@ -225,7 +304,7 @@ test('custom presets preserve the edited snapshot without mutating the saved def
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await expect(page.getByLabel('Preset').locator('option:checked')).toHaveText('Custom settings');
-  await expect(page.locator('#vf-last-selected-preset')).toContainText('Night bass');
+  await expect(page.locator('#dbs-last-selected-preset')).toContainText('Night bass');
   await expect(page.getByLabel('Soft glow')).toHaveValue('0.1');
 
   await page.getByRole('button', { name: 'Load saved preset Night bass' }).click();
@@ -292,14 +371,14 @@ test('settings desktop layout matches the wide grouped target without dropping c
 
     return {
       panel: rect('#panel'),
-      preset: rect('#vf-preset', '.setting-row'),
-      colour: rect('#vf-colour-set', '.setting-row'),
-      shape: rect('#vf-shape', '.setting-row'),
-      customColour: rect('#vf-custom-colour', '.setting-row'),
-      theme: rect('#vf-interface-theme', '.setting-row'),
+      preset: rect('#dbs-preset', '.setting-row'),
+      colour: rect('#dbs-colour-set', '.setting-row'),
+      shape: rect('#dbs-shape', '.setting-row'),
+      customColour: rect('#dbs-custom-colour', '.setting-row'),
+      theme: rect('#dbs-interface-theme', '.setting-row'),
       presetActions: rect('.preset-actions'),
-      customAccent: rect('#vf-custom-interface-accent', '.setting-row'),
-      interfaceAccent: rect('#vf-interface-accent', '.setting-row'),
+      customAccent: rect('#dbs-custom-interface-accent', '.setting-row'),
+      interfaceAccent: rect('#dbs-interface-accent', '.setting-row'),
       reset: rect('.panel-reset'),
       faq: rect('.help-details'),
     };
