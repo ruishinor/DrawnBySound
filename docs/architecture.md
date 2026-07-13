@@ -37,7 +37,7 @@ index.html
       → capture adapters / transport / renderer / diagnostics
 ```
 
-`src/main.ts` remains intentionally large for this release candidate. The next defensible extraction is a source-session coordinator, but only after browser and device acceptance establishes the required behavior. A broad component/framework migration is not justified.
+`src/main.ts` remains intentionally large for this release candidate. Asynchronous source ownership is isolated in `src/app/SourceSessionCoordinator.ts`; broader component or framework migration is not justified without separate product evidence.
 
 ## Settings boundary
 
@@ -64,7 +64,7 @@ One active presentation source exists at a time:
 - Browser-media fallback uses `MediaFilePlayer` and a local blob URL.
 - Stop selects an explicit silence source and pauses analysis.
 
-Capture tracks are observed for external termination. The current code does not yet serialize overlapping asynchronous source starts. Add a session token or cancellation coordinator only if E2E/manual testing reproduces a race.
+Capture tracks are observed for external termination. Every user source change advances a source-session revision and stops the current source. A permission or file operation that resolves after a newer action is treated as stale and its acquired handle is stopped instead of becoming active.
 
 ## Rendering invariants
 
@@ -84,7 +84,7 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-The development server is fixed to port 5174 with `strictPort: true`. Preview uses 4173. The AudioWorklet is emitted through Vite’s worker URL path and verified after every production build.
+The development server is fixed to port 5174 with `strictPort: true`. Preview uses 4173. The AudioWorklet is emitted through Vite’s worker URL path and verified after every production build. Production preview and Vercel additionally apply CSP, Permissions-Policy, Referrer-Policy, MIME-sniffing protection, clickjacking protection, and same-origin resource policy. Vercel adds HSTS over HTTPS.
 
 Without COOP/COEP, capability handling disables live sources and exposes demo-only status rather than attempting a degraded real-time transport.
 
@@ -110,8 +110,8 @@ No ASR model, transcript persistence, or lyrics UI is included in this release c
 
 - No postMessage fallback for browsers without SharedArrayBuffer.
 - No service worker; local processing does not guarantee offline startup.
-- No source-start cancellation token yet.
 - No dedicated AudioWorklet crash health channel.
 - No focus trap inside the settings sheet, although open/close/focus restoration is implemented.
-- Development dependency audit findings require an isolated breaking toolchain upgrade; production dependency audit is clean.
-- Automated browser and exact-device acceptance remain release gates.
+- CSP still permits inline styles because appearance and rendering controls set bounded style properties at runtime; scripts do not permit inline execution.
+- GitHub Actions use maintained major-version tags rather than commit-SHA pins.
+- Automated browser, live-deployment header, and exact-device acceptance remain release gates.

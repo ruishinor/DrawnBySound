@@ -26,14 +26,21 @@ export async function startMic(graph: AudioGraph): Promise<MicHandle> {
     if (!(error instanceof DOMException) || error.name !== 'OverconstrainedError') throw error;
     stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
-  await graph.resume();
-  const src = graph.ctx.createMediaStreamSource(stream);
-  graph.connectInput(src);
-  return {
-    stream,
-    stop() {
-      src.disconnect();
-      for (const track of stream.getTracks()) track.stop();
-    },
-  };
+  let src: MediaStreamAudioSourceNode | null = null;
+  try {
+    await graph.resume();
+    src = graph.ctx.createMediaStreamSource(stream);
+    graph.connectInput(src);
+    return {
+      stream,
+      stop() {
+        src?.disconnect();
+        for (const track of stream.getTracks()) track.stop();
+      },
+    };
+  } catch (error) {
+    src?.disconnect();
+    for (const track of stream.getTracks()) track.stop();
+    throw error;
+  }
 }
