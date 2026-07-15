@@ -4,6 +4,28 @@
 
 Drawn by Sound captures or imports audio, extracts acoustic features locally, and renders responsive XY/Lissajous-style geometry through WebGL2. It has no account system, no analytics, and no intentional raw-audio upload.
 
+
+<!-- Large Hero Spot -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0e0ad19e-b364-4368-9bdf-2a48d2d46f5d" width="100%" />
+</p>
+
+<table width="100%">
+  <!-- Row 1: Variations -->
+  <tr>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/2970d369-4901-4c49-9d01-d86c91046494" width="100%" /></td>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/e7998800-0cfc-43ce-afc3-2571196c04ef" width="100%" /></td>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/1309aa54-9497-4094-bfb3-268a0c6f2b78" width="100%" /></td>
+  </tr>
+  <!-- Row 2: Variations -->
+  <tr>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/1424f4de-bd75-48d9-a8fd-d825965bd7d7" width="100%" /></td>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/00fbcd95-cd5e-4212-9512-515bbb8643f4" width="100%" /></td>
+    <td width="33.3%"><img src="https://github.com/user-attachments/assets/202b2d04-a3e2-4e14-aa78-4bf57adb3b35" width="100%" /></td>
+  </tr>
+</table>
+
+
 ## Current release state
 
 The audio/rendering core, fullscreen presentation, display wake-lock preference, and the 2026-07-11 UI/persistence pass are implemented. The repository is a **release candidate**, not an unconditional production sign-off. Typecheck, unit tests, production build, AudioWorklet/security-policy verification, and the full dependency audit pass. Browser E2E, live-deployment header checks, and exact-device acceptance remain required.
