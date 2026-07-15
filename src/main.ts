@@ -1,5 +1,8 @@
 import './app/ui/app.css';
+import { inject } from '@vercel/analytics';
 import { APP_NAME } from './app/config';
+
+inject();
 import { Renderer } from './core/render/Renderer';
 import { MODE_BY_ID, StereoXY, type ModeContext } from './core/render/modes';
 import type { AudioFrameSource } from './core/capture/AudioFrameSource';

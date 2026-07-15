@@ -14,7 +14,7 @@ const PREVIEW_CSP = [
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
   "font-src 'self'",
-  "connect-src 'self'",
+  "connect-src 'self' https://vitals.vercel-insights.com",
   "worker-src 'self'",
   "manifest-src 'self'",
   "frame-src 'none'",
